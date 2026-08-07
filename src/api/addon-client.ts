@@ -93,16 +93,16 @@ export class AddonClient {
   }
 
   async getCatalog(type: string, id: string, extra?: Record<string, string>): Promise<{ metas: MetaPreview[] }> {
-    let url = `${this.baseUrl}/catalog/${type}/${id}`;
-    if (extra) {
+    let url = `${this.baseUrl}/catalog/${type}/${id}`
+    if (extra && Object.keys(extra).length > 0) {
       const extraStr = Object.entries(extra)
-        .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-        .join('&');
-      url += `/${extraStr}`;
+        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+        .join('&')
+      url += `/${extraStr}`
     }
-    url += '.json';
-    const res = await fetchWithProxy(url);
-    return res.json();
+    url += '.json'
+    const res = await fetchWithProxy(url)
+    return res.json()
   }
 
   async getMeta(type: string, id: string): Promise<{ meta: Meta }> {

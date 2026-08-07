@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { MetaPreview } from '../../api/addon-client'
+import { useFocusable } from '@noriginmedia/norigin-spatial-navigation'
 
 interface Props {
   item: MetaPreview
@@ -7,11 +8,20 @@ interface Props {
 
 export default function MediaCard({ item }: Props) {
   const navigate = useNavigate()
+  
+  const onEnterPress = () => {
+    navigate(`/detail/${item.type}/${encodeURIComponent(item.id)}`)
+  }
+
+  const { ref, focused } = useFocusable({
+    onEnterPress
+  })
 
   return (
     <div
-      className="media-card"
-      onClick={() => navigate(`/detail/${item.type}/${encodeURIComponent(item.id)}`)}
+      ref={ref}
+      className={`media-card ${focused ? 'focused' : ''}`}
+      onClick={onEnterPress}
     >
       {item.poster ? (
         <img

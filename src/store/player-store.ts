@@ -53,7 +53,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   isPlaying: false,
   currentTime: 0,
   duration: 0,
-  volume: 1,
+  volume: parseFloat(localStorage.getItem('webvio_volume') || '1'),
   muted: false,
   subtitles: [],
   selectedSubtitle: null,
@@ -66,7 +66,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   updateTime: (time) => set({ currentTime: time }),
   setDuration: (duration) => set({ duration }),
   setVolume: (volume) => {
-    localStorage.setItem('tornode_volume', String(volume));
+    localStorage.setItem('webvio_volume', String(volume));
     set({ volume });
   },
   toggleMute: () => set((s) => ({ muted: !s.muted })),
@@ -91,7 +91,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const { currentMeta, currentVideo, currentTime, duration } = get();
     if (!currentMeta || currentTime < 10 || duration < 30) return;
     const videoId = currentVideo?.id || currentMeta.id;
-    const progress = JSON.parse(localStorage.getItem('tornode_progress') || '{}');
+    const progress = JSON.parse(localStorage.getItem('webvio_progress') || '{}');
     progress[videoId] = {
       time: currentTime,
       duration,
@@ -111,11 +111,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
           }
         : null,
     };
-    localStorage.setItem('tornode_progress', JSON.stringify(progress));
+    localStorage.setItem('webvio_progress', JSON.stringify(progress));
   },
 
   loadProgress: (videoId) => {
-    const progress = JSON.parse(localStorage.getItem('tornode_progress') || '{}');
+    const progress = JSON.parse(localStorage.getItem('webvio_progress') || '{}');
     return progress[videoId]?.time || 0;
   },
 }));

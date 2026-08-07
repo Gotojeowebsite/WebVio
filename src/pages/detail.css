@@ -7,7 +7,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 60vh;
+  min-height: calc(80vh - var(--navbar-height));
+  padding-top: calc(var(--navbar-height) + 30px);
   color: var(--color-text-muted);
 }
 

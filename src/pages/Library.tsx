@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/auth-store'
 import { useNavigate } from 'react-router-dom'
 import MediaCard from '../components/catalog/MediaCard'
 import { MetaPreview } from '../api/addon-client'
+import { pullCollectionsFromNuvio } from '../api/nuvio-auth'
 
 type SimklStatus = 'watching' | 'plantowatch' | 'completed' | 'hold' | 'dropped'
 
@@ -22,21 +23,56 @@ const TYPE_TABS = [
 ]
 
 export default function Library() {
-  const { simklConnected, simklAccessToken, simklClientId } = useAuthStore()
+  const { simklConnected, simklAccessToken, simklClientId, nuvioLoggedIn, nuvioAccessToken } = useAuthStore()
   const navigate = useNavigate()
+  const [source, setSource] = useState<'nuvio' | 'simkl'>(nuvioLoggedIn ? 'nuvio' : 'simkl')
   const [activeStatus, setActiveStatus] = useState<SimklStatus | 'all'>('watching')
   const [activeType, setActiveType] = useState('shows')
   const [items, setItems] = useState<MetaPreview[]>([])
   const [loading, setLoading] = useState(false)
 
+  // Fetch Nuvio Collections
   useEffect(() => {
-    if (!simklConnected) return
+    if (!nuvioLoggedIn || !nuvioAccessToken || source !== 'nuvio') return
+
+    const fetchNuvioCollections = async () => {
+      setLoading(true)
+      try {
+        const collections = await pullCollectionsFromNuvio(nuvioAccessToken)
+
+        const allItems: MetaPreview[] = []
+        collections.forEach((col: any) => {
+          if (Array.isArray(col.items)) {
+            col.items.forEach((item: any) => {
+              allItems.push({
+                id: item.id || item.imdb || item.content_id,
+                type: item.type || item.content_type || 'movie',
+                name: item.name || item.title || 'Untitled',
+                poster: item.poster || item.poster_path,
+                year: item.year,
+              })
+            })
+          }
+        })
+        setItems(allItems)
+      } catch (err) {
+        console.error('Failed to pull Nuvio collections:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchNuvioCollections()
+  }, [nuvioLoggedIn, nuvioAccessToken, source])
+
+  // Fetch Simkl Library
+  useEffect(() => {
+    if (!simklConnected || source !== 'simkl') return
 
     const fetchLibrary = async () => {
       setLoading(true)
       try {
         const { getAllItems } = await import('../api/simkl')
-        const statusParam = activeStatus === 'all' ? undefined : activeStatus
         const data = await getAllItems(
           simklClientId,
           simklAccessToken!,
@@ -44,7 +80,6 @@ export default function Library() {
           undefined
         )
 
-        // Convert Simkl items to MetaPreview format
         const mapped: MetaPreview[] = (data || [])
           .filter((item: any) => {
             if (activeStatus === 'all') return true
@@ -68,15 +103,15 @@ export default function Library() {
     }
 
     fetchLibrary()
-  }, [simklConnected, simklAccessToken, simklClientId, activeStatus, activeType])
+  }, [simklConnected, simklAccessToken, simklClientId, activeStatus, activeType, source])
 
-  if (!simklConnected) {
+  if (!simklConnected && !nuvioLoggedIn) {
     return (
       <div className="page library-page">
         <div className="empty-state">
           <p className="empty-state-icon">📊</p>
-          <h2>Connect Simkl to view your library</h2>
-          <p>Track your movies and shows across all your devices</p>
+          <h2>Connect Nuvio or Simkl to view your library</h2>
+          <p>Sync your collection cards and track progress across all devices</p>
           <button className="btn-primary" onClick={() => navigate('/settings')}>
             Go to Settings
           </button>
@@ -89,29 +124,53 @@ export default function Library() {
     <div className="page library-page">
       <h1 className="page-title">My Library</h1>
 
-      <div className="library-type-tabs">
-        {TYPE_TABS.map(tab => (
+      {/* Source Toggle */}
+      <div className="library-type-tabs" style={{ marginBottom: '1.5rem' }}>
+        {nuvioLoggedIn && (
           <button
-            key={tab.key}
-            className={`tab-btn ${activeType === tab.key ? 'tab-active' : ''}`}
-            onClick={() => setActiveType(tab.key)}
+            className={`tab-btn ${source === 'nuvio' ? 'tab-active' : ''}`}
+            onClick={() => setSource('nuvio')}
           >
-            {tab.label}
+            ⚡ Nuvio Saved Collections
           </button>
-        ))}
+        )}
+        {simklConnected && (
+          <button
+            className={`tab-btn ${source === 'simkl' ? 'tab-active' : ''}`}
+            onClick={() => setSource('simkl')}
+          >
+            📊 Simkl History
+          </button>
+        )}
       </div>
 
-      <div className="library-status-tabs">
-        {STATUS_TABS.map(tab => (
-          <button
-            key={tab.key}
-            className={`tab-btn tab-btn-small ${activeStatus === tab.key ? 'tab-active' : ''}`}
-            onClick={() => setActiveStatus(tab.key)}
-          >
-            <span>{tab.icon}</span> {tab.label}
-          </button>
-        ))}
-      </div>
+      {source === 'simkl' && (
+        <>
+          <div className="library-type-tabs">
+            {TYPE_TABS.map(tab => (
+              <button
+                key={tab.key}
+                className={`tab-btn ${activeType === tab.key ? 'tab-active' : ''}`}
+                onClick={() => setActiveType(tab.key)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="library-status-tabs">
+            {STATUS_TABS.map(tab => (
+              <button
+                key={tab.key}
+                className={`tab-btn tab-btn-small ${activeStatus === tab.key ? 'tab-active' : ''}`}
+                onClick={() => setActiveStatus(tab.key)}
+              >
+                <span>{tab.icon}</span> {tab.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {loading && (
         <div className="media-grid">
@@ -125,7 +184,7 @@ export default function Library() {
         <div className="empty-state">
           <p className="empty-state-icon">📭</p>
           <h3>Nothing here yet</h3>
-          <p>Start watching something to build your library</p>
+          <p>Start saving cards or watching titles to build your library</p>
         </div>
       )}
 

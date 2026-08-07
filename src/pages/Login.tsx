@@ -68,7 +68,7 @@ export default function Login() {
       <div className="login-container">
         <div className="login-card card-glass">
           <div className="login-header">
-            <h1 className="login-brand">⚡ TorNode</h1>
+            <h1 className="login-brand">⚡ Webvio</h1>
             <p className="login-tagline">Stream anything. Track everything.</p>
           </div>
 

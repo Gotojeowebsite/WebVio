@@ -8,19 +8,23 @@ export default function Settings() {
     torboxApiKey, torboxConnected, torboxUser,
     simklAccessToken, simklConnected, simklUser,
     corsProxyUrl, simklClientId,
+    traktAccessToken, traktConnected, traktUser, traktClientId,
     clearNuvioAuth, setTorboxAuth, clearTorboxAuth,
     setSimklAuth, clearSimklAuth,
-    setCorsProxyUrl, setSimklClientId,
+    setTraktAuth, clearTraktAuth,
+    setCorsProxyUrl, setSimklClientId, setTraktClientId,
   } = useAuthStore()
 
-  const { addons, removeAddon, toggleAddon, addAddonByUrl } = useAddonStore()
+  const { addons, removeAddon, toggleAddon, addAddonByUrl, moveAddonUp, moveAddonDown, reorderAddons } = useAddonStore()
 
   const [torboxKeyInput, setTorboxKeyInput] = useState(torboxApiKey || '')
   const [corsInput, setCorsInput] = useState(corsProxyUrl)
   const [simklIdInput, setSimklIdInput] = useState(simklClientId)
+  const [traktIdInput, setTraktIdInput] = useState(traktClientId)
   const [addonUrlInput, setAddonUrlInput] = useState('')
   const [addonLoading, setAddonLoading] = useState(false)
   const [torboxLoading, setTorboxLoading] = useState(false)
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
   useEffect(() => {
@@ -185,8 +189,8 @@ export default function Settings() {
             <div className="settings-row">
               <button
                 className="btn-primary"
-                onClick={() => {
-                  const { getAuthUrl } = require('../api/simkl')
+                onClick={async () => {
+                  const { getAuthUrl } = await import('../api/simkl')
                   const url = getAuthUrl(
                     simklClientId,
                     window.location.origin + '/settings'
@@ -212,6 +216,70 @@ export default function Settings() {
             Get your Client ID from{' '}
             <a href="https://simkl.com/settings/developer/" target="_blank" rel="noopener noreferrer">
               simkl.com/settings/developer
+            </a>
+          </p>
+        </div>
+      </section>
+
+      {/* Trakt */}
+      <section className="settings-section">
+        <h2 className="settings-section-title">
+          <span className="settings-icon">📺</span>
+          Trakt Tracking
+          {traktConnected && <span className="badge badge-success">Connected</span>}
+          <span className="settings-subtitle">Optional — for watch history tracking</span>
+        </h2>
+        <div className="card-glass settings-card">
+          <div className="settings-row">
+            <input
+              type="text"
+              className="input"
+              placeholder="Trakt Client ID"
+              value={traktIdInput}
+              onChange={(e) => setTraktIdInput(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <button
+              className="btn-secondary"
+              onClick={() => {
+                setTraktClientId(traktIdInput.trim())
+                setMessage({ text: 'Trakt Client ID saved', type: 'success' })
+              }}
+            >
+              Save
+            </button>
+          </div>
+          {traktClientId && !traktConnected && (
+            <div className="settings-row">
+              <button
+                className="btn-primary"
+                onClick={async () => {
+                  const { getTraktAuthUrl } = await import('../api/trakt')
+                  const url = getTraktAuthUrl(
+                    traktClientId,
+                    window.location.origin + '/settings'
+                  )
+                  window.location.href = url
+                }}
+              >
+                Connect with Trakt
+              </button>
+            </div>
+          )}
+          {traktConnected && traktUser && (
+            <div className="settings-row">
+              <p className="settings-value">
+                Connected as: {traktUser.username || traktUser.name || 'User'}
+              </p>
+              <button className="btn-ghost" onClick={clearTraktAuth}>
+                Disconnect
+              </button>
+            </div>
+          )}
+          <p className="settings-help">
+            Get your Client ID from{' '}
+            <a href="https://trakt.tv/oauth/applications" target="_blank" rel="noopener noreferrer">
+              trakt.tv/oauth/applications
             </a>
           </p>
         </div>
@@ -278,8 +346,23 @@ export default function Settings() {
         </div>
 
         <div className="addon-list">
-          {addons.map((addon) => (
-            <div key={addon.manifestUrl} className={`card-glass addon-item ${!addon.enabled ? 'addon-disabled' : ''}`}>
+          {addons.map((addon, index) => (
+            <div
+              key={addon.manifestUrl}
+              draggable
+              onDragStart={() => setDraggedIndex(index)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => {
+                if (draggedIndex !== null && draggedIndex !== index) {
+                  reorderAddons(draggedIndex, index)
+                  setDraggedIndex(null)
+                }
+              }}
+              className={`card-glass addon-item ${!addon.enabled ? 'addon-disabled' : ''} ${draggedIndex === index ? 'dragging' : ''}`}
+            >
+              <div className="drag-handle" title="Drag to reorder" style={{ cursor: 'grab', padding: '0 8px', opacity: 0.5, fontSize: '1.2rem' }}>
+                ⋮⋮
+              </div>
               <div className="addon-info">
                 {addon.manifest.logo && (
                   <img
@@ -303,6 +386,24 @@ export default function Settings() {
                 </div>
               </div>
               <div className="addon-actions">
+                <button
+                  className="btn-ghost"
+                  onClick={() => moveAddonUp(index)}
+                  disabled={index === 0}
+                  title="Move Up"
+                  style={{ opacity: index === 0 ? 0.3 : 1 }}
+                >
+                  ▲
+                </button>
+                <button
+                  className="btn-ghost"
+                  onClick={() => moveAddonDown(index)}
+                  disabled={index === addons.length - 1}
+                  title="Move Down"
+                  style={{ opacity: index === addons.length - 1 ? 0.3 : 1 }}
+                >
+                  ▼
+                </button>
                 <button
                   className="btn-ghost"
                   onClick={() => toggleAddon(addon.manifestUrl)}

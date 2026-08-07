@@ -1,17 +1,40 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePlayerStore } from '../store/player-store'
 import { useAuthStore } from '../store/auth-store'
 import { markWatched } from '../api/simkl'
+import { markTraktWatched } from '../api/trakt'
 import VideoPlayer from '../components/player/VideoPlayer'
+import { AddonClient, Subtitle } from '../api/addon-client'
 import './player.css'
 
 export default function Player() {
   const navigate = useNavigate()
   const { currentStream, currentMeta, currentVideo, saveProgress, updateTime, setDuration, loadProgress, clearPlayer } = usePlayerStore()
-  const { simklConnected, simklAccessToken, simklClientId } = useAuthStore()
+  const { simklConnected, simklAccessToken, simklClientId, traktConnected, traktAccessToken, traktClientId } = useAuthStore()
   const progressInterval = useRef<number | null>(null)
   const scrobbled = useRef(false)
+  const traktScrobbled = useRef(false)
+  const [subtitles, setSubtitles] = useState<Subtitle[]>([])
+
+  useEffect(() => {
+    let mounted = true
+    const fetchSubtitles = async () => {
+      if (!currentMeta) return
+      try {
+        const client = new AddonClient('https://opensubtitles-v3.strem.io/manifest.json')
+        const idToFetch = currentVideo?.id || currentMeta.id
+        const res = await client.getSubtitles(currentMeta.type, idToFetch)
+        if (mounted && res.subtitles) {
+          setSubtitles(res.subtitles)
+        }
+      } catch (err) {
+        console.error('Failed to fetch subtitles', err)
+      }
+    }
+    fetchSubtitles()
+    return () => { mounted = false }
+  }, [currentMeta, currentVideo])
 
   // Auto-save progress every 5 seconds
   useEffect(() => {
@@ -66,7 +89,40 @@ export default function Player() {
         }
       }
     }
-  }, [updateTime, simklConnected, simklAccessToken, simklClientId, currentMeta, currentVideo])
+
+    // Trakt scrobble at 80% watched
+    if (
+      !traktScrobbled.current &&
+      traktConnected &&
+      traktAccessToken &&
+      traktClientId &&
+      currentMeta &&
+      duration > 0 &&
+      time / duration > 0.8
+    ) {
+      traktScrobbled.current = true
+      const imdbId = currentMeta.id.startsWith('tt') ? currentMeta.id : undefined
+      if (imdbId) {
+        if (currentMeta.type === 'movie') {
+          markTraktWatched(traktClientId, traktAccessToken, {
+            movies: [{ title: currentMeta.name, year: currentMeta.year, ids: { imdb: imdbId }, watched_at: new Date().toISOString() }],
+          }).catch(() => {})
+        } else if (currentVideo?.season && currentVideo?.episode) {
+          markTraktWatched(traktClientId, traktAccessToken, {
+            shows: [{
+              title: currentMeta.name,
+              year: currentMeta.year,
+              ids: { imdb: imdbId },
+              seasons: [{
+                number: currentVideo.season,
+                episodes: [{ number: currentVideo.episode, watched_at: new Date().toISOString() }],
+              }],
+            }],
+          }).catch(() => {})
+        }
+      }
+    }
+  }, [updateTime, simklConnected, simklAccessToken, simklClientId, traktConnected, traktAccessToken, traktClientId, currentMeta, currentVideo])
 
   const handleEnded = useCallback(() => {
     saveProgress()
@@ -116,6 +172,7 @@ export default function Player() {
         onDurationChange={setDuration}
         onEnded={handleEnded}
         startTime={startTime}
+        subtitles={subtitles}
       />
     </div>
   )

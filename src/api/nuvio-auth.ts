@@ -76,3 +76,95 @@ export async function validateToken(accessToken: string): Promise<boolean> {
   });
   return res.ok;
 }
+
+export interface NuvioAddonPushItem {
+  url: string;
+  name?: string;
+  enabled: boolean;
+  sort_order: number;
+}
+
+export async function pushAddonsToNuvio(
+  accessToken: string,
+  addons: NuvioAddonPushItem[],
+  profileId: number = 1
+): Promise<void> {
+  const res = await fetch(`${NUVIO_SUPABASE_URL}/rest/v1/rpc/sync_push_addons`, {
+    method: 'POST',
+    headers: {
+      'apikey': NUVIO_SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      p_profile_id: profileId,
+      p_addons: addons.map((a, i) => ({
+        url: a.url,
+        name: a.name || '',
+        enabled: a.enabled,
+        sort_order: i,
+      })),
+    }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    console.warn('Failed to push addon reorder to Nuvio:', errorData);
+  }
+}
+
+export async function pullCollectionsFromNuvio(
+  accessToken: string,
+  profileId: number = 1
+): Promise<any[]> {
+  const res = await fetch(`${NUVIO_SUPABASE_URL}/rest/v1/rpc/sync_pull_collections`, {
+    method: 'POST',
+    headers: {
+      'apikey': NUVIO_SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      p_profile_id: profileId,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    console.warn('Failed to pull collections from Nuvio:', errorData);
+    return [];
+  }
+
+  const data = await res.json();
+  if (Array.isArray(data) && data.length > 0) {
+    const blob = data[0];
+    if (blob && blob.collections_json) {
+      return Array.isArray(blob.collections_json) ? blob.collections_json : [];
+    }
+  }
+  return [];
+}
+
+export async function pushCollectionsToNuvio(
+  accessToken: string,
+  collections: any[],
+  profileId: number = 1
+): Promise<void> {
+  const res = await fetch(`${NUVIO_SUPABASE_URL}/rest/v1/rpc/sync_push_collections`, {
+    method: 'POST',
+    headers: {
+      'apikey': NUVIO_SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      p_profile_id: profileId,
+      p_collections_json: collections,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    console.warn('Failed to push collections to Nuvio:', errorData);
+  }
+}

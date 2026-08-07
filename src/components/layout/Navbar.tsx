@@ -1,11 +1,24 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useFocusable } from '@noriginmedia/norigin-spatial-navigation'
 import { useAuthStore } from '../../store/auth-store'
 
 export default function Navbar() {
   const [searchQuery, setSearchQuery] = useState('')
   const [scrolled, setScrolled] = useState(false)
   const navigate = useNavigate()
+
+  const { ref: brandRef, focused: brandFocused } = useFocusable({
+    onEnterPress: () => navigate('/')
+  })
+
+  const { ref: searchRef, focused: searchFocused } = useFocusable({
+    onEnterPress: () => {
+      if (searchQuery.trim()) {
+        navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
+      }
+    }
+  })
   const { torboxConnected, simklConnected } = useAuthStore()
 
   useEffect(() => {
@@ -23,11 +36,16 @@ export default function Navbar() {
 
   return (
     <nav className={`navbar ${scrolled ? 'scrolled' : ''}`}>
-      <a href="/" className="navbar-brand" onClick={(e) => { e.preventDefault(); navigate('/') }}>
-        ⚡ TorNode
+      <a 
+        href="/" 
+        ref={brandRef}
+        className={`navbar-brand ${brandFocused ? 'focused' : ''}`} 
+        onClick={(e) => { e.preventDefault(); navigate('/') }}
+      >
+        ⚡ Webvio
       </a>
 
-      <form className="navbar-search" onSubmit={handleSearch}>
+      <form className={`navbar-search ${searchFocused ? 'focused' : ''}`} onSubmit={handleSearch} ref={searchRef}>
         <span className="navbar-search-icon">🔍</span>
         <input
           type="text"

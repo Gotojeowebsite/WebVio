@@ -8,9 +8,10 @@ interface VideoPlayerProps {
   onDurationChange?: (duration: number) => void
   onEnded?: () => void
   startTime?: number
+  subtitles?: { id: string, url: string, lang: string }[]
 }
 
-export default function VideoPlayer({ src, title, onTimeUpdate, onDurationChange, onEnded, startTime }: VideoPlayerProps) {
+export default function VideoPlayer({ src, title, onTimeUpdate, onDurationChange, onEnded, startTime, subtitles }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const hlsRef = useRef<Hls | null>(null)
   const [error, setError] = useState('')
@@ -25,6 +26,14 @@ export default function VideoPlayer({ src, title, onTimeUpdate, onDurationChange
       hlsRef.current = null
     }
 
+    // Named handler so it can be cleaned up properly
+    const onMetadataLoaded = () => {
+      video.play().catch(() => {})
+      if (startTime && startTime > 0) {
+        video.currentTime = startTime
+      }
+    }
+
     if (src.includes('.m3u8') && Hls.isSupported()) {
       const hls = new Hls({
         maxBufferLength: 30,
@@ -33,12 +42,7 @@ export default function VideoPlayer({ src, title, onTimeUpdate, onDurationChange
       hlsRef.current = hls
       hls.loadSource(src)
       hls.attachMedia(video)
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(() => {})
-        if (startTime && startTime > 0) {
-          video.currentTime = startTime
-        }
-      })
+      hls.on(Hls.Events.MANIFEST_PARSED, onMetadataLoaded)
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
           setError(`Playback error: ${data.details}`)
@@ -52,24 +56,15 @@ export default function VideoPlayer({ src, title, onTimeUpdate, onDurationChange
     } else if (src.includes('.m3u8') && video.canPlayType('application/vnd.apple.mpegurl')) {
       // Safari native HLS
       video.src = src
-      video.addEventListener('loadedmetadata', () => {
-        video.play().catch(() => {})
-        if (startTime && startTime > 0) {
-          video.currentTime = startTime
-        }
-      })
+      video.addEventListener('loadedmetadata', onMetadataLoaded)
     } else {
       // Direct MP4 / other formats
       video.src = src
-      video.addEventListener('loadedmetadata', () => {
-        video.play().catch(() => {})
-        if (startTime && startTime > 0) {
-          video.currentTime = startTime
-        }
-      })
+      video.addEventListener('loadedmetadata', onMetadataLoaded)
     }
 
     return () => {
+      video.removeEventListener('loadedmetadata', onMetadataLoaded)
       if (hlsRef.current) {
         hlsRef.current.destroy()
         hlsRef.current = null
@@ -115,7 +110,19 @@ export default function VideoPlayer({ src, title, onTimeUpdate, onDurationChange
         controls
         playsInline
         autoPlay
-      />
+        crossOrigin="anonymous"
+      >
+        {subtitles?.map((sub, idx) => (
+          <track
+            key={sub.id}
+            kind="subtitles"
+            label={sub.lang}
+            srcLang={sub.lang}
+            src={sub.url}
+            default={idx === 0 && sub.lang.toLowerCase() === 'eng'}
+          />
+        ))}
+      </video>
     </div>
   )
 }

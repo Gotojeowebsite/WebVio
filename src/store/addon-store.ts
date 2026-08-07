@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { AddonClient, AddonManifest } from '../api/addon-client';
-import { getAddonCollection } from '../api/nuvio-auth';
+import { getAddonCollection, pushAddonsToNuvio } from '../api/nuvio-auth';
+import { useAuthStore } from './auth-store';
 
 export interface InstalledAddon {
   manifestUrl: string;
@@ -19,6 +20,8 @@ interface AddonState {
   removeAddon: (manifestUrl: string) => void;
   toggleAddon: (manifestUrl: string) => void;
   reorderAddons: (from: number, to: number) => void;
+  moveAddonUp: (index: number) => void;
+  moveAddonDown: (index: number) => void;
   saveToStorage: () => void;
   loadFromStorage: () => Promise<void>;
 }
@@ -73,30 +76,98 @@ export const useAddonStore = create<AddonState>((set, get) => ({
       order: get().addons.length,
     };
 
-    set({ addons: [...get().addons, addon] });
+    const newAddons = [...get().addons, addon];
+    set({ addons: newAddons });
     get().saveToStorage();
+
+    const { nuvioAccessToken } = useAuthStore.getState();
+    if (nuvioAccessToken) {
+      pushAddonsToNuvio(
+        nuvioAccessToken,
+        newAddons.map((a, i) => ({
+          url: a.manifestUrl,
+          name: a.manifest.name,
+          enabled: a.enabled,
+          sort_order: i,
+        }))
+      );
+    }
   },
 
   removeAddon: (manifestUrl) => {
-    set({ addons: get().addons.filter(a => a.manifestUrl !== manifestUrl) });
+    const newAddons = get().addons.filter(a => a.manifestUrl !== manifestUrl);
+    set({ addons: newAddons });
     get().saveToStorage();
+
+    const { nuvioAccessToken } = useAuthStore.getState();
+    if (nuvioAccessToken) {
+      pushAddonsToNuvio(
+        nuvioAccessToken,
+        newAddons.map((a, i) => ({
+          url: a.manifestUrl,
+          name: a.manifest.name,
+          enabled: a.enabled,
+          sort_order: i,
+        }))
+      );
+    }
   },
 
   toggleAddon: (manifestUrl) => {
-    set({
-      addons: get().addons.map(a =>
-        a.manifestUrl === manifestUrl ? { ...a, enabled: !a.enabled } : a
-      ),
-    });
+    const newAddons = get().addons.map(a =>
+      a.manifestUrl === manifestUrl ? { ...a, enabled: !a.enabled } : a
+    );
+    set({ addons: newAddons });
     get().saveToStorage();
+
+    const { nuvioAccessToken } = useAuthStore.getState();
+    if (nuvioAccessToken) {
+      pushAddonsToNuvio(
+        nuvioAccessToken,
+        newAddons.map((a, i) => ({
+          url: a.manifestUrl,
+          name: a.manifest.name,
+          enabled: a.enabled,
+          sort_order: i,
+        }))
+      );
+    }
   },
 
   reorderAddons: (from, to) => {
-    const addons = [...get().addons];
+    const list = get().addons;
+    if (from < 0 || from >= list.length || to < 0 || to >= list.length) return;
+    const addons = [...list];
     const [moved] = addons.splice(from, 1);
     addons.splice(to, 0, moved);
-    set({ addons: addons.map((a, i) => ({ ...a, order: i })) });
+    const updated = addons.map((a, i) => ({ ...a, order: i }));
+    set({ addons: updated });
     get().saveToStorage();
+
+    const { nuvioAccessToken } = useAuthStore.getState();
+    if (nuvioAccessToken) {
+      pushAddonsToNuvio(
+        nuvioAccessToken,
+        updated.map((a, i) => ({
+          url: a.manifestUrl,
+          name: a.manifest.name,
+          enabled: a.enabled,
+          sort_order: i,
+        }))
+      );
+    }
+  },
+
+  moveAddonUp: (index) => {
+    if (index > 0) {
+      get().reorderAddons(index, index - 1);
+    }
+  },
+
+  moveAddonDown: (index) => {
+    if (index < get().addons.length - 1) {
+      get().reorderAddons(index, index + 1);
+    }
   },
 
   saveToStorage: () => {
@@ -106,11 +177,11 @@ export const useAddonStore = create<AddonState>((set, get) => ({
       enabled: a.enabled,
       order: a.order,
     }));
-    localStorage.setItem('tornode_addons', JSON.stringify(data));
+    localStorage.setItem('webvio_addons', JSON.stringify(data));
   },
 
   loadFromStorage: async () => {
-    const stored = localStorage.getItem('tornode_addons');
+    const stored = localStorage.getItem('webvio_addons');
     if (!stored) return;
     try {
       const data = JSON.parse(stored) as InstalledAddon[];

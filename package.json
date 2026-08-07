@@ -1,5 +1,5 @@
 {
-  "name": "tornode-init",
+  "name": "webvio-init",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@noriginmedia/norigin-spatial-navigation": "^3.3.0",
     "hls.js": "^1.6.17",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

@@ -30,11 +30,11 @@ export default function Home() {
       }
     }
     init()
-  }, [nuvioAccessToken, nuvioUserId])
+  }, [nuvioAccessToken, nuvioUserId, loadFromStorage, loadAddonsFromNuvio])
 
   // Load continue watching from localStorage
   useEffect(() => {
-    const progress = JSON.parse(localStorage.getItem('tornode_progress') || '{}')
+    const progress = JSON.parse(localStorage.getItem('webvio_progress') || '{}')
     const items: MetaPreview[] = Object.values(progress)
       .sort((a: any, b: any) => b.updatedAt - a.updatedAt)
       .slice(0, 20)
