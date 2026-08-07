@@ -95,13 +95,16 @@ export class AddonClient {
   async getCatalog(type: string, id: string, extra?: Record<string, string>): Promise<{ metas: MetaPreview[] }> {
     let url = `${this.baseUrl}/catalog/${type}/${id}`
     if (extra && Object.keys(extra).length > 0) {
+      // Stremio protocol: extras go in path as key=value pairs separated by & (not a query string)
       const extraStr = Object.entries(extra)
         .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
         .join('&')
-      url += `/${extraStr}`
+      url += `/${extraStr}.json`
+    } else {
+      url += '.json'
     }
-    url += '.json'
     const res = await fetchWithProxy(url)
+    if (!res.ok) throw new Error(`Catalog fetch failed: ${res.status}`)
     return res.json()
   }
 

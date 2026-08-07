@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '../store/auth-store'
 import { useAddonStore } from '../store/addon-store'
 
@@ -6,24 +7,29 @@ export default function Settings() {
   const {
     nuvioEmail, nuvioLoggedIn, nuvioAccessToken,
     torboxApiKey, torboxConnected, torboxUser,
-    simklAccessToken, simklConnected, simklUser,
-    corsProxyUrl, simklClientId,
+    simklAccessToken, simklConnected, simklUser, simklClientId, simklClientSecret,
     traktAccessToken, traktConnected, traktUser, traktClientId,
+    corsProxyUrl,
     clearNuvioAuth, setTorboxAuth, clearTorboxAuth,
-    setSimklAuth, clearSimklAuth,
+    setSimklAuth, clearSimklAuth, setSimklClientId, setSimklClientSecret,
     setTraktAuth, clearTraktAuth,
-    setCorsProxyUrl, setSimklClientId, setTraktClientId,
+    setCorsProxyUrl, setTraktClientId,
   } = useAuthStore()
 
   const { addons, removeAddon, toggleAddon, addAddonByUrl, moveAddonUp, moveAddonDown, reorderAddons } = useAddonStore()
 
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+
   const [torboxKeyInput, setTorboxKeyInput] = useState(torboxApiKey || '')
   const [corsInput, setCorsInput] = useState(corsProxyUrl)
   const [simklIdInput, setSimklIdInput] = useState(simklClientId)
+  const [simklSecretInput, setSimklSecretInput] = useState(simklClientSecret)
   const [traktIdInput, setTraktIdInput] = useState(traktClientId)
   const [addonUrlInput, setAddonUrlInput] = useState('')
   const [addonLoading, setAddonLoading] = useState(false)
   const [torboxLoading, setTorboxLoading] = useState(false)
+  const [simklLoading, setSimklLoading] = useState(false)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
@@ -33,6 +39,39 @@ export default function Settings() {
       return () => clearTimeout(timer)
     }
   }, [message])
+
+  // Handle Simkl OAuth callback: ?code=...
+  useEffect(() => {
+    const code = searchParams.get('code')
+    const state = searchParams.get('state')
+    // Only handle if it looks like a Simkl callback (not Trakt)
+    if (!code || state) return
+    if (simklConnected) return
+
+    const storedClientId = useAuthStore.getState().simklClientId
+    const storedSecret = useAuthStore.getState().simklClientSecret
+    if (!storedClientId || !storedSecret) return
+
+    setSimklLoading(true)
+    ;(async () => {
+      try {
+        const { exchangeCode, getUser } = await import('../api/simkl')
+        const redirectUri = window.location.origin + '/settings'
+        const token = await exchangeCode(storedClientId, storedSecret, code, redirectUri)
+        const user = await getUser(storedClientId, token)
+        setSimklAuth(token, user)
+        setMessage({ text: '✅ Simkl connected!', type: 'success' })
+      } catch (err) {
+        console.error('Simkl OAuth error:', err)
+        setMessage({ text: 'Simkl connection failed. Check your Client Secret.', type: 'error' })
+      } finally {
+        setSimklLoading(false)
+        // Clean the code out of the URL
+        navigate('/settings', { replace: true })
+      }
+    })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleTorboxConnect = async () => {
     if (!torboxKeyInput.trim()) return
@@ -163,44 +202,65 @@ export default function Settings() {
           <span className="settings-icon">📊</span>
           Simkl Tracking
           {simklConnected && <span className="badge badge-success">Connected</span>}
+          {simklLoading && <span className="badge">Connecting...</span>}
           <span className="settings-subtitle">Optional — for watch history tracking</span>
         </h2>
         <div className="card-glass settings-card">
-          <div className="settings-row">
-            <input
-              type="text"
-              className="input"
-              placeholder="Simkl Client ID"
-              value={simklIdInput}
-              onChange={(e) => setSimklIdInput(e.target.value)}
-              style={{ flex: 1 }}
-            />
-            <button
-              className="btn-secondary"
-              onClick={() => {
-                setSimklClientId(simklIdInput.trim())
-                setMessage({ text: 'Simkl Client ID saved', type: 'success' })
-              }}
-            >
-              Save
-            </button>
-          </div>
-          {simklClientId && !simklConnected && (
-            <div className="settings-row">
-              <button
-                className="btn-primary"
-                onClick={async () => {
-                  const { getAuthUrl } = await import('../api/simkl')
-                  const url = getAuthUrl(
-                    simklClientId,
-                    window.location.origin + '/settings'
-                  )
-                  window.location.href = url
-                }}
-              >
-                Connect with Simkl
-              </button>
-            </div>
+          {!simklConnected && (
+            <>
+              <div className="settings-row">
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="Simkl Client ID"
+                  value={simklIdInput}
+                  onChange={(e) => setSimklIdInput(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+              </div>
+              <div className="settings-row">
+                <input
+                  type="password"
+                  className="input"
+                  placeholder="Simkl Client Secret"
+                  value={simklSecretInput}
+                  onChange={(e) => setSimklSecretInput(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  className="btn-secondary"
+                  onClick={() => {
+                    if (!simklIdInput.trim() || !simklSecretInput.trim()) {
+                      setMessage({ text: 'Enter both Client ID and Client Secret', type: 'error' })
+                      return
+                    }
+                    setSimklClientId(simklIdInput.trim())
+                    setSimklClientSecret(simklSecretInput.trim())
+                    setMessage({ text: 'Simkl credentials saved', type: 'success' })
+                  }}
+                >
+                  Save
+                </button>
+              </div>
+              {simklClientId && simklClientSecret && (
+                <div className="settings-row">
+                  <button
+                    className="btn-primary"
+                    disabled={simklLoading}
+                    onClick={async () => {
+                      const { getAuthUrl } = await import('../api/simkl')
+                      const url = getAuthUrl(
+                        simklClientId,
+                        window.location.origin + '/settings'
+                      )
+                      window.location.href = url
+                    }}
+                  >
+                    {simklLoading ? 'Connecting...' : 'Connect with Simkl'}
+                  </button>
+                </div>
+              )}
+            </>
           )}
           {simklConnected && simklUser && (
             <div className="settings-row">
@@ -213,10 +273,14 @@ export default function Settings() {
             </div>
           )}
           <p className="settings-help">
-            Get your Client ID from{' '}
-            <a href="https://simkl.com/settings/developer/" target="_blank" rel="noopener noreferrer">
-              simkl.com/settings/developer
+            Create an app at{' '}
+            <a href="https://simkl.com/settings/developer/new/" target="_blank" rel="noopener noreferrer">
+              simkl.com/settings/developer/new
             </a>
+            {' '}and set the Redirect URI to{' '}
+            <code style={{ fontSize: '0.8em', background: 'rgba(255,255,255,0.08)', padding: '1px 6px', borderRadius: '4px' }}>
+              {window.location.origin}/settings
+            </code>
           </p>
         </div>
       </section>

@@ -95,7 +95,6 @@ html {
 body {
   min-height: 100vh;
   background-color: var(--color-bg-base);
-  overflow-x: hidden;
 }
 
 img, picture, video, canvas, svg {

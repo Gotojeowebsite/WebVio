@@ -26,12 +26,13 @@ interface AuthState {
   simklAccessToken: string | null;
   simklUser: SimklUser | null;
   simklConnected: boolean;
+  simklClientId: string;
+  simklClientSecret: string;
   traktAccessToken: string | null;
   traktUser: any | null;
   traktConnected: boolean;
-  corsProxyUrl: string;
-  simklClientId: string;
   traktClientId: string;
+  corsProxyUrl: string;
 
   setNuvioAuth: (accessToken: string, refreshToken: string, userId: string, email?: string) => void;
   clearNuvioAuth: () => void;
@@ -39,11 +40,12 @@ interface AuthState {
   clearTorboxAuth: () => void;
   setSimklAuth: (accessToken: string, user?: SimklUser) => void;
   clearSimklAuth: () => void;
+  setSimklClientId: (id: string) => void;
+  setSimklClientSecret: (secret: string) => void;
   setTraktAuth: (accessToken: string, user?: any) => void;
   clearTraktAuth: () => void;
-  setCorsProxyUrl: (url: string) => void;
-  setSimklClientId: (id: string) => void;
   setTraktClientId: (id: string) => void;
+  setCorsProxyUrl: (url: string) => void;
   loadFromStorage: () => void;
 }
 
@@ -59,12 +61,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   simklAccessToken: null,
   simklUser: null,
   simklConnected: false,
+  simklClientId: '',
+  simklClientSecret: '',
   traktAccessToken: null,
   traktUser: null,
   traktConnected: false,
-  corsProxyUrl: '',
-  simklClientId: '',
   traktClientId: '',
+  corsProxyUrl: '',
 
   setNuvioAuth: (accessToken, refreshToken, userId, email) => {
     localStorage.setItem('webvio_nuvio_accessToken', accessToken);
@@ -118,6 +121,16 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ simklAccessToken: null, simklUser: null, simklConnected: false });
   },
 
+  setSimklClientId: (id) => {
+    localStorage.setItem('webvio_simkl_clientId', id);
+    set({ simklClientId: id });
+  },
+
+  setSimklClientSecret: (secret) => {
+    localStorage.setItem('webvio_simkl_clientSecret', secret);
+    set({ simklClientSecret: secret });
+  },
+
   setTraktAuth: (accessToken, user) => {
     localStorage.setItem('webvio_trakt_token', accessToken);
     if (user) localStorage.setItem('webvio_trakt_user', JSON.stringify(user));
@@ -130,20 +143,15 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ traktAccessToken: null, traktUser: null, traktConnected: false });
   },
 
+  setTraktClientId: (id) => {
+    localStorage.setItem('webvio_trakt_clientId', id);
+    set({ traktClientId: id });
+  },
+
   setCorsProxyUrl: (url) => {
     localStorage.setItem('webvio_cors_proxy', url);
     setCorsProxy(url);
     set({ corsProxyUrl: url });
-  },
-
-  setSimklClientId: (id) => {
-    localStorage.setItem('webvio_simkl_clientId', id);
-    set({ simklClientId: id });
-  },
-
-  setTraktClientId: (id) => {
-    localStorage.setItem('webvio_trakt_clientId', id);
-    set({ traktClientId: id });
   },
 
   loadFromStorage: () => {
@@ -155,11 +163,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     const torboxUserStr = localStorage.getItem('webvio_torbox_user');
     const simklToken = localStorage.getItem('webvio_simkl_token');
     const simklUserStr = localStorage.getItem('webvio_simkl_user');
+    const simklClientId = localStorage.getItem('webvio_simkl_clientId') || '';
+    const simklClientSecret = localStorage.getItem('webvio_simkl_clientSecret') || '';
     const traktToken = localStorage.getItem('webvio_trakt_token');
     const traktUserStr = localStorage.getItem('webvio_trakt_user');
-    const corsProxy = localStorage.getItem('webvio_cors_proxy') || '';
-    const simklClientId = localStorage.getItem('webvio_simkl_clientId') || '';
     const traktClientId = localStorage.getItem('webvio_trakt_clientId') || '';
+    const corsProxy = localStorage.getItem('webvio_cors_proxy') || '';
 
     if (corsProxy) setCorsProxy(corsProxy);
 
@@ -175,12 +184,13 @@ export const useAuthStore = create<AuthState>((set) => ({
       simklAccessToken: simklToken,
       simklUser: simklUserStr ? JSON.parse(simklUserStr) : null,
       simklConnected: !!simklToken,
+      simklClientId,
+      simklClientSecret,
       traktAccessToken: traktToken,
       traktUser: traktUserStr ? JSON.parse(traktUserStr) : null,
       traktConnected: !!traktToken,
-      corsProxyUrl: corsProxy,
-      simklClientId,
       traktClientId,
+      corsProxyUrl: corsProxy,
     });
   },
 }));

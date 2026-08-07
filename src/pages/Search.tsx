@@ -10,40 +10,63 @@ export default function Search() {
   const [inputValue, setInputValue] = useState(query)
   const [results, setResults] = useState<MetaPreview[]>([])
   const [loading, setLoading] = useState(false)
-  const navigate = useNavigate()
-  const { addons } = useAddonStore()
+  const { addons, loadFromStorage } = useAddonStore()
+
+  useEffect(() => {
+    loadFromStorage()
+  }, [loadFromStorage])
+
+  useEffect(() => {
+    setInputValue(query)
+  }, [query])
 
   const performSearch = useCallback(async (q: string) => {
-    if (!q.trim()) {
+    const trimmed = q.trim()
+    if (!trimmed) {
       setResults([])
+      setLoading(false)
       return
     }
+
     setLoading(true)
     try {
+      let currentAddons = useAddonStore.getState().addons
+      if (currentAddons.length === 0) {
+        await loadFromStorage()
+        currentAddons = useAddonStore.getState().addons
+      }
+
       const allResults: MetaPreview[] = []
-      const enabledAddons = addons.filter(a => a.enabled)
+      const enabledAddons = currentAddons.filter(a => a.enabled)
 
       const promises = enabledAddons.map(async (addon) => {
         const client = new AddonClient(addon.manifestUrl)
         client.manifest = addon.manifest
 
-        if (!client.supportsSearch()) return
+        const catalogs = addon.manifest.catalogs || []
+        for (const catalog of catalogs) {
+          // A catalog supports search if it declares 'search' in its extra field
+          // OR if there's a manifest-level extraSupported hint
+          const hasExtraSearch = catalog.extra?.some(e => e.name === 'search') ?? false
+          const hasManifestSearch = (addon.manifest as any).extraSupported?.includes('search') ?? false
+          const supportsSearch = hasExtraSearch || hasManifestSearch
 
-        for (const catalog of addon.manifest.catalogs) {
-          const hasSearch = catalog.extra?.some(e => e.name === 'search')
-          if (!hasSearch) continue
+          // Skip catalogs that explicitly have extras but don't include 'search'
+          if (!supportsSearch) {
+            continue
+          }
 
           try {
             const result = await client.getCatalog(
               catalog.type,
               catalog.id,
-              { search: q }
+              { search: trimmed }
             )
-            if (result.metas) {
+            if (result && Array.isArray(result.metas)) {
               allResults.push(...result.metas)
             }
-          } catch {
-            // Skip failed addon catalogs
+          } catch (e) {
+            // Silently skip failed catalogs
           }
         }
       })
@@ -53,7 +76,7 @@ export default function Search() {
       // Deduplicate by ID
       const seen = new Set<string>()
       const deduped = allResults.filter(item => {
-        if (seen.has(item.id)) return false
+        if (!item || !item.id || seen.has(item.id)) return false
         seen.add(item.id)
         return true
       })
@@ -64,11 +87,29 @@ export default function Search() {
     } finally {
       setLoading(false)
     }
-  }, [addons])
+  }, [loadFromStorage])
+
+  // Live debounced search as user types
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (inputValue.trim() !== query) {
+        if (inputValue.trim()) {
+          setSearchParams({ q: inputValue.trim() }, { replace: true })
+        } else if (query) {
+          setSearchParams({}, { replace: true })
+        }
+      }
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [inputValue, query, setSearchParams])
 
   useEffect(() => {
     if (query) {
       performSearch(query)
+    } else {
+      setResults([])
+      setLoading(false)
     }
   }, [query, performSearch])
 
@@ -76,6 +117,7 @@ export default function Search() {
     e.preventDefault()
     if (inputValue.trim()) {
       setSearchParams({ q: inputValue.trim() })
+      performSearch(inputValue.trim())
     }
   }
 
@@ -87,7 +129,7 @@ export default function Search() {
           <input
             type="text"
             className="input search-input-large"
-            placeholder="Search movies, series, anime..."
+            placeholder="Search movies, series, anime, documentaries..."
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             autoFocus
@@ -111,15 +153,15 @@ export default function Search() {
       {loading && (
         <div className="search-loading">
           <div className="loading-spinner" />
-          <p>Searching across all addons...</p>
+          <p>Searching across all installed addons...</p>
         </div>
       )}
 
       {!loading && query && results.length === 0 && (
         <div className="search-empty">
           <p className="search-empty-icon">🔍</p>
-          <h3>No results found</h3>
-          <p>Try a different search term or check your addons</p>
+          <h3>No results found for "{query}"</h3>
+          <p>Try searching for a title like "Inception", "Breaking Bad", or "Avatar"</p>
         </div>
       )}
 
@@ -140,9 +182,10 @@ export default function Search() {
         <div className="search-empty">
           <p className="search-empty-icon">🎬</p>
           <h3>Search for anything</h3>
-          <p>Find movies, TV shows, and anime across all your addons</p>
+          <p>Discover movies, TV shows, and anime across all your addons</p>
         </div>
       )}
     </div>
   )
 }
+

@@ -26,6 +26,11 @@ interface AddonState {
   loadFromStorage: () => Promise<void>;
 }
 
+const DEFAULT_ADDON_URLS = [
+  'https://v3-cinemeta.strem.io/manifest.json',
+  'https://opensubtitles-v3.strem.io/manifest.json',
+];
+
 export const useAddonStore = create<AddonState>((set, get) => ({
   addons: [],
   loading: false,
@@ -35,10 +40,11 @@ export const useAddonStore = create<AddonState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const urls = await getAddonCollection(accessToken, userId);
+      const targetUrls = urls.length > 0 ? urls : DEFAULT_ADDON_URLS;
       const addons: InstalledAddon[] = [];
 
       const results = await Promise.allSettled(
-        urls.map(async (url: string, index: number) => {
+        targetUrls.map(async (url: string, index: number) => {
           try {
             const client = new AddonClient(url);
             const manifest = await client.loadManifest();
@@ -182,12 +188,41 @@ export const useAddonStore = create<AddonState>((set, get) => ({
 
   loadFromStorage: async () => {
     const stored = localStorage.getItem('webvio_addons');
-    if (!stored) return;
+    if (stored) {
+      try {
+        const data = JSON.parse(stored) as InstalledAddon[];
+        if (data && data.length > 0) {
+          set({ addons: data });
+          return;
+        }
+      } catch {
+        // Fallback to default
+      }
+    }
+
+    // Initialize with default addons if none stored
+    set({ loading: true });
     try {
-      const data = JSON.parse(stored) as InstalledAddon[];
-      set({ addons: data });
+      const defaultAddons: InstalledAddon[] = [];
+      for (let i = 0; i < DEFAULT_ADDON_URLS.length; i++) {
+        const url = DEFAULT_ADDON_URLS[i];
+        try {
+          const client = new AddonClient(url);
+          const manifest = await client.loadManifest();
+          defaultAddons.push({
+            manifestUrl: url,
+            manifest,
+            enabled: true,
+            order: i,
+          });
+        } catch (e) {
+          console.warn('Could not load default addon:', url, e);
+        }
+      }
+      set({ addons: defaultAddons, loading: false });
+      get().saveToStorage();
     } catch {
-      // Ignore corrupted storage
+      set({ loading: false });
     }
   },
 }));

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAddonStore } from '../store/addon-store'
 import { useAuthStore } from '../store/auth-store'
@@ -15,11 +15,15 @@ interface CatalogData {
 
 export default function Home() {
   const { addons, loadFromStorage, loadAddonsFromNuvio } = useAddonStore()
-  const { nuvioAccessToken, nuvioUserId } = useAuthStore()
+  const { nuvioAccessToken, nuvioUserId, simklConnected, simklAccessToken, simklClientId } = useAuthStore()
   const [catalogs, setCatalogs] = useState<CatalogData[]>([])
   const [hero, setHero] = useState<MetaPreview | null>(null)
   const [continueWatching, setContinueWatching] = useState<MetaPreview[]>([])
+  const [continueLoading, setContinueLoading] = useState(false)
   const navigate = useNavigate()
+  const heroVideoRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [heroIndex, setHeroIndex] = useState(0)
+  const [heroItems, setHeroItems] = useState<MetaPreview[]>([])
 
   // Load addons on mount
   useEffect(() => {
@@ -32,20 +36,112 @@ export default function Home() {
     init()
   }, [nuvioAccessToken, nuvioUserId, loadFromStorage, loadAddonsFromNuvio])
 
-  // Load continue watching from localStorage
+  // Load Continue Watching: Simkl "watching" list + local progress fallback
   useEffect(() => {
-    const progress = JSON.parse(localStorage.getItem('webvio_progress') || '{}')
-    const items: MetaPreview[] = Object.values(progress)
-      .sort((a: any, b: any) => b.updatedAt - a.updatedAt)
-      .slice(0, 20)
-      .map((p: any) => ({
-        id: p.meta.id,
-        type: p.meta.type,
-        name: p.meta.name,
-        poster: p.meta.poster,
-      }))
-    setContinueWatching(items)
-  }, [])
+    const loadContinueWatching = async () => {
+      setContinueLoading(true)
+      try {
+        if (simklConnected && simklAccessToken && simklClientId) {
+          // Fetch from Simkl — both shows and movies with "watching" status
+          const { getAllItems } = await import('../api/simkl')
+
+          const [showsData, moviesData] = await Promise.allSettled([
+            getAllItems(simklClientId, simklAccessToken, 'shows'),
+            getAllItems(simklClientId, simklAccessToken, 'movies'),
+          ])
+
+          const watching: MetaPreview[] = []
+
+          if (showsData.status === 'fulfilled') {
+            showsData.value
+              .filter((item: any) => item.status === 'watching')
+              .forEach((item: any) => {
+                watching.push({
+                  id: item.show?.ids?.imdb || `simkl-${item.show?.ids?.simkl}`,
+                  type: 'series',
+                  name: item.show?.title || 'Unknown',
+                  poster: item.show?.poster
+                    ? `https://simkl.in/posters/${item.show.poster}_m.webp`
+                    : undefined,
+                  year: item.show?.year,
+                })
+              })
+          }
+
+          if (moviesData.status === 'fulfilled') {
+            moviesData.value
+              .filter((item: any) => item.status === 'watching')
+              .forEach((item: any) => {
+                watching.push({
+                  id: item.movie?.ids?.imdb || `simkl-${item.movie?.ids?.simkl}`,
+                  type: 'movie',
+                  name: item.movie?.title || 'Unknown',
+                  poster: item.movie?.poster
+                    ? `https://simkl.in/posters/${item.movie.poster}_m.webp`
+                    : undefined,
+                  year: item.movie?.year,
+                })
+              })
+          }
+
+          // Merge with local progress (local takes priority / appears first)
+          const localProgress = JSON.parse(localStorage.getItem('webvio_progress') || '{}')
+          const localItems: MetaPreview[] = Object.values(localProgress)
+            .sort((a: any, b: any) => b.updatedAt - a.updatedAt)
+            .slice(0, 10)
+            .map((p: any) => ({
+              id: p.meta.id,
+              type: p.meta.type,
+              name: p.meta.name,
+              poster: p.meta.poster,
+            }))
+
+          // Merge: local first, then Simkl, deduplicate by id
+          const seen = new Set<string>()
+          const merged: MetaPreview[] = []
+          for (const item of [...localItems, ...watching]) {
+            if (item.id && !seen.has(item.id)) {
+              seen.add(item.id)
+              merged.push(item)
+            }
+          }
+
+          setContinueWatching(merged)
+        } else {
+          // No Simkl — fall back to local progress only
+          const progress = JSON.parse(localStorage.getItem('webvio_progress') || '{}')
+          const items: MetaPreview[] = Object.values(progress)
+            .sort((a: any, b: any) => b.updatedAt - a.updatedAt)
+            .slice(0, 20)
+            .map((p: any) => ({
+              id: p.meta.id,
+              type: p.meta.type,
+              name: p.meta.name,
+              poster: p.meta.poster,
+            }))
+          setContinueWatching(items)
+        }
+      } catch (err) {
+        console.error('Failed to load continue watching:', err)
+        // Graceful fallback to local
+        const progress = JSON.parse(localStorage.getItem('webvio_progress') || '{}')
+        const items: MetaPreview[] = Object.values(progress)
+          .sort((a: any, b: any) => b.updatedAt - a.updatedAt)
+          .slice(0, 20)
+          .map((p: any) => ({
+            id: p.meta.id,
+            type: p.meta.type,
+            name: p.meta.name,
+            poster: p.meta.poster,
+          }))
+        setContinueWatching(items)
+      } finally {
+        setContinueLoading(false)
+      }
+    }
+
+    loadContinueWatching()
+  }, [simklConnected, simklAccessToken, simklClientId])
 
   // Fetch catalogs from addons
   useEffect(() => {
@@ -65,6 +161,8 @@ export default function Home() {
 
     setCatalogs(catalogEntries)
 
+    const collected: MetaPreview[] = []
+
     enabledAddons.forEach(addon => {
       const client = new AddonClient(addon.manifestUrl)
       client.manifest = addon.manifest
@@ -78,6 +176,11 @@ export default function Home() {
             c.key === key ? { ...c, items: result.metas || [], loading: false } : c
           ))
           if (result.metas?.length > 0) {
+            collected.push(...result.metas.slice(0, 5))
+            setHeroItems(prev => {
+              const next = [...prev, ...result.metas.slice(0, 5)]
+              return next
+            })
             setHero(prev => prev || result.metas[0])
           }
         } catch {
@@ -89,8 +192,39 @@ export default function Home() {
     })
   }, [addons])
 
+  // Auto-rotate hero every 8 seconds
+  useEffect(() => {
+    if (heroItems.length < 2) return
+    if (heroVideoRef.current) clearInterval(heroVideoRef.current)
+    heroVideoRef.current = setInterval(() => {
+      setHeroIndex(prev => {
+        const next = (prev + 1) % heroItems.length
+        setHero(heroItems[next])
+        return next
+      })
+    }, 8000)
+    return () => {
+      if (heroVideoRef.current) clearInterval(heroVideoRef.current)
+    }
+  }, [heroItems])
+
+  const continueLabel = simklConnected
+    ? '▶ Continue Watching  •  📊 Simkl'
+    : '▶ Continue Watching'
+
   return (
     <div className="home-page">
+      {/* Continue Watching — always at the very top */}
+      {(continueWatching.length > 0 || continueLoading) && (
+        <div className="continue-watching-section">
+          <CatalogRow
+            title={continueLabel}
+            items={continueWatching}
+            loading={continueLoading}
+          />
+        </div>
+      )}
+
       {/* Hero Section */}
       {hero && (
         <div className="hero-section" style={{
@@ -118,14 +252,25 @@ export default function Home() {
               </button>
             </div>
           </div>
+          {/* Hero dot indicators */}
+          {heroItems.length > 1 && (
+            <div className="hero-dots">
+              {heroItems.slice(0, 8).map((_, i) => (
+                <button
+                  key={i}
+                  className={`hero-dot ${i === heroIndex ? 'hero-dot-active' : ''}`}
+                  onClick={() => {
+                    setHeroIndex(i)
+                    setHero(heroItems[i])
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       <div className="home-catalogs">
-        {continueWatching.length > 0 && (
-          <CatalogRow title="Continue Watching" items={continueWatching} />
-        )}
-
         {catalogs.map(cat => (
           <CatalogRow
             key={cat.key}

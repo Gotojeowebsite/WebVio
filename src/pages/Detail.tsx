@@ -8,7 +8,7 @@ import './detail.css'
 export default function Detail() {
   const { type, id } = useParams<{ type: string; id: string }>()
   const navigate = useNavigate()
-  const { addons } = useAddonStore()
+  const { addons, loadFromStorage } = useAddonStore()
   const [meta, setMeta] = useState<Meta | null>(null)
   const [loading, setLoading] = useState(true)
   const [streamPickerOpen, setStreamPickerOpen] = useState(false)
@@ -20,7 +20,14 @@ export default function Detail() {
     setLoading(true)
 
     const fetchMeta = async () => {
-      const enabledAddons = addons.filter(a => a.enabled)
+      // Ensure addons are loaded from storage first
+      let currentAddons = addons
+      if (currentAddons.length === 0) {
+        await loadFromStorage()
+        currentAddons = useAddonStore.getState().addons
+      }
+
+      const enabledAddons = currentAddons.filter(a => a.enabled)
 
       for (const addon of enabledAddons) {
         try {
@@ -42,7 +49,7 @@ export default function Detail() {
     }
 
     fetchMeta()
-  }, [type, id, addons])
+  }, [type, id, addons, loadFromStorage])
 
   const handlePlay = (videoId?: string) => {
     if (!meta || !type) return
