@@ -1,0 +1,150 @@
+.detail-page {
+  padding: 0;
+}
+
+.detail-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  color: var(--color-text-muted);
+}
+
+.detail-hero {
+  position: relative;
+  min-height: 60vh;
+  background-size: cover;
+  background-position: center top;
+  display: flex;
+  align-items: flex-end;
+}
+
+.detail-hero-content {
+  position: relative;
+  z-index: 2;
+  padding: var(--spacing-8) var(--spacing-8) var(--spacing-10);
+  max-width: 700px;
+}
+
+.detail-logo {
+  max-width: 350px;
+  max-height: 120px;
+  margin-bottom: var(--spacing-4);
+}
+
+.detail-info {
+  display: flex;
+  gap: var(--spacing-3);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.detail-description {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+  margin-bottom: var(--spacing-6);
+  max-width: 600px;
+}
+
+.detail-actions {
+  display: flex;
+  gap: var(--spacing-3);
+}
+
+.detail-body {
+  padding: var(--spacing-8);
+}
+
+.detail-section {
+  margin-bottom: var(--spacing-10);
+}
+
+.detail-section h3 {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  margin-bottom: var(--spacing-4);
+}
+
+.detail-cast {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+}
+
+.detail-cast-item {
+  padding: var(--spacing-1) var(--spacing-3);
+  background: var(--color-surface-2);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.season-tabs {
+  display: flex;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-6);
+  flex-wrap: wrap;
+}
+
+.episode-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.episode-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  padding: var(--spacing-4);
+  background: var(--color-surface-2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.episode-item:hover {
+  background: var(--color-surface-1);
+  border-color: rgba(124, 58, 237, 0.3);
+  transform: translateX(4px);
+}
+
+.episode-number {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--color-text-muted);
+  min-width: 50px;
+  text-align: center;
+}
+
+.episode-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.episode-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.episode-overview {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.episode-date {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.episode-play {
+  flex-shrink: 0;
+}

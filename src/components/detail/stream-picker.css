@@ -1,0 +1,134 @@
+.stream-picker-modal {
+  max-width: 720px;
+  max-height: 85vh;
+}
+
+.stream-picker-title {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+}
+
+.stream-picker-subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.stream-filter-bar {
+  display: flex;
+  gap: var(--spacing-2);
+  padding: 0 var(--spacing-5);
+  padding-bottom: var(--spacing-3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stream-filter-tab {
+  padding: var(--spacing-1) var(--spacing-3);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.stream-filter-tab:hover {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.stream-filter-tab.active {
+  color: var(--color-accent-primary);
+  background: rgba(124, 58, 237, 0.12);
+  border-color: rgba(124, 58, 237, 0.25);
+}
+
+.stream-list-container {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.stream-loading,
+.stream-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-12) 0;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.stream-error {
+  padding: var(--spacing-3) var(--spacing-4);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius-md);
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--spacing-4);
+}
+
+.stream-item {
+  position: relative;
+}
+
+.stream-item.resolving {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.stream-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.stream-item-left {
+  display: flex;
+  gap: var(--spacing-3);
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+}
+
+.stream-type-icon {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.stream-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.stream-addon-source {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin-top: var(--spacing-1);
+  opacity: 0.7;
+}
+
+.stream-item-detail {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin-top: var(--spacing-2);
+  padding-left: 2.3rem;
+}
+
+.stream-spinner {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.stream-picker-footer {
+  padding: var(--spacing-3) var(--spacing-5);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--color-bg-elevated);
+}

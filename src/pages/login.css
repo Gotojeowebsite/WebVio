@@ -1,0 +1,93 @@
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 50%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+    var(--color-bg-base);
+}
+
+.login-container {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 460px;
+  padding: var(--spacing-4);
+}
+
+.login-card {
+  padding: var(--spacing-8);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: var(--spacing-8);
+}
+
+.login-brand {
+  font-size: var(--font-size-4xl);
+  font-weight: 900;
+  background: var(--color-accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: var(--spacing-2);
+}
+
+.login-tagline {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.login-step-title {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  margin-bottom: var(--spacing-2);
+}
+
+.login-mode-toggle {
+  display: flex;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-6);
+}
+
+.login-error {
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--spacing-3);
+  padding: var(--spacing-3);
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.login-status {
+  color: var(--color-success);
+  font-size: var(--font-size-sm);
+}
+
+.login-optional-section {
+  padding: var(--spacing-4);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--spacing-4);
+}
+
+.login-optional-section h4 {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  margin-bottom: var(--spacing-1);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
