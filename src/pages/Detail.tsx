@@ -20,7 +20,6 @@ export default function Detail() {
     setLoading(true)
 
     const fetchMeta = async () => {
-      // Ensure addons are loaded from storage first
       let currentAddons = addons
       if (currentAddons.length === 0) {
         await loadFromStorage()
@@ -28,18 +27,32 @@ export default function Detail() {
       }
 
       const enabledAddons = currentAddons.filter(a => a.enabled)
+      const providersToTry = [
+        ...enabledAddons.map(a => ({ url: a.manifestUrl, manifest: a.manifest })),
+        { url: 'https://v3-cinemeta.strem.io/manifest.json', manifest: null },
+        { url: 'https://anime-kitsu.strem.fun/manifest.json', manifest: null },
+      ]
 
-      for (const addon of enabledAddons) {
+      const typesToTry = [type, 'series', 'movie', 'anime', 'tv'].filter(Boolean) as string[]
+
+      for (const provider of providersToTry) {
         try {
-          const client = new AddonClient(addon.manifestUrl)
-          client.manifest = addon.manifest
-          if (!client.supportsResource('meta')) continue
+          const client = new AddonClient(provider.url)
+          if (provider.manifest) {
+            client.manifest = provider.manifest
+          }
 
-          const result = await client.getMeta(type, id)
-          if (result.meta) {
-            setMeta(result.meta)
-            setLoading(false)
-            return
+          for (const tryType of typesToTry) {
+            try {
+              const result = await client.getMeta(tryType, id)
+              if (result && result.meta) {
+                setMeta(result.meta)
+                setLoading(false)
+                return
+              }
+            } catch {
+              // Try next type
+            }
           }
         } catch {
           continue

@@ -13,6 +13,33 @@ interface CatalogData {
   loading: boolean
 }
 
+const DEFAULT_PROVIDERS = [
+  {
+    manifestUrl: 'https://v3-cinemeta.strem.io/manifest.json',
+    manifest: {
+      id: 'com.linvo.cinemeta',
+      name: 'Cinemeta',
+      catalogs: [
+        { type: 'movie', id: 'top', name: 'Popular Movies' },
+        { type: 'series', id: 'top', name: 'Popular Series' },
+        { type: 'movie', id: 'imdbRating', name: 'Top Rated Movies' },
+        { type: 'series', id: 'imdbRating', name: 'Top Rated Series' },
+      ],
+    },
+  },
+  {
+    manifestUrl: 'https://anime-kitsu.strem.fun/manifest.json',
+    manifest: {
+      id: 'community.anime.kitsu',
+      name: 'Anime Kitsu',
+      catalogs: [
+        { type: 'anime', id: 'kitsu-anime-trending', name: 'Trending Anime' },
+        { type: 'anime', id: 'kitsu-anime-popular', name: 'Popular Anime' },
+      ],
+    },
+  },
+]
+
 export default function Home() {
   const { addons, loadFromStorage, loadAddonsFromNuvio } = useAddonStore()
   const { nuvioAccessToken, nuvioUserId, simklConnected, simklAccessToken, simklClientId } = useAuthStore()
@@ -123,7 +150,6 @@ export default function Home() {
         }
       } catch (err) {
         console.error('Failed to load continue watching:', err)
-        // Graceful fallback to local
         const progress = JSON.parse(localStorage.getItem('webvio_progress') || '{}')
         const items: MetaPreview[] = Object.values(progress)
           .sort((a: any, b: any) => b.updatedAt - a.updatedAt)
@@ -143,50 +169,60 @@ export default function Home() {
     loadContinueWatching()
   }, [simklConnected, simklAccessToken, simklClientId])
 
-  // Fetch catalogs from addons
+  // Fetch catalogs from addons + default providers
   useEffect(() => {
     const enabledAddons = addons.filter(a => a.enabled)
-    if (enabledAddons.length === 0) return
+    const providersToLoad = enabledAddons.length > 0
+      ? enabledAddons.map(a => ({ manifestUrl: a.manifestUrl, manifest: a.manifest }))
+      : DEFAULT_PROVIDERS
 
     const catalogEntries: CatalogData[] = []
 
-    enabledAddons.forEach(addon => {
-      const catalogsToFetch = (addon.manifest.catalogs || []).slice(0, 3)
-      catalogsToFetch.forEach(cat => {
-        const key = `${addon.manifest.id}:${cat.type}:${cat.id}`
-        const title = cat.name || `${cat.type} - ${cat.id}`
-        catalogEntries.push({ key, title: `${title} • ${addon.manifest.name}`, items: [], loading: true })
+    providersToLoad.forEach(provider => {
+      const catalogsToFetch = (provider.manifest.catalogs || [])
+        .filter((cat: any) => !cat.extraRequired && !cat.extra?.some((e: any) => e.isRequired))
+        .slice(0, 4)
+
+      catalogsToFetch.forEach((cat: any) => {
+        const key = `${provider.manifest.id || provider.manifestUrl}:${cat.type}:${cat.id}`
+        const title = cat.name || `${cat.type.toUpperCase()} • ${cat.id}`
+        catalogEntries.push({
+          key,
+          title: `${title} • ${provider.manifest.name}`,
+          items: [],
+          loading: true,
+        })
       })
     })
 
     setCatalogs(catalogEntries)
 
-    const collected: MetaPreview[] = []
+    providersToLoad.forEach(provider => {
+      const client = new AddonClient(provider.manifestUrl)
+      if (provider.manifest) client.manifest = provider.manifest as any
 
-    enabledAddons.forEach(addon => {
-      const client = new AddonClient(addon.manifestUrl)
-      client.manifest = addon.manifest
+      const catalogsToFetch = (provider.manifest.catalogs || [])
+        .filter((cat: any) => !cat.extraRequired && !cat.extra?.some((e: any) => e.isRequired))
+        .slice(0, 4)
 
-      const catalogsToFetch = (addon.manifest.catalogs || []).slice(0, 3)
-      catalogsToFetch.forEach(async (cat) => {
-        const key = `${addon.manifest.id}:${cat.type}:${cat.id}`
+      catalogsToFetch.forEach(async (cat: any) => {
+        const key = `${provider.manifest.id || provider.manifestUrl}:${cat.type}:${cat.id}`
         try {
           const result = await client.getCatalog(cat.type, cat.id)
-          setCatalogs(prev => prev.map(c =>
-            c.key === key ? { ...c, items: result.metas || [], loading: false } : c
-          ))
-          if (result.metas?.length > 0) {
-            collected.push(...result.metas.slice(0, 5))
+          if (result && Array.isArray(result.metas) && result.metas.length > 0) {
+            setCatalogs(prev =>
+              prev.map(c => (c.key === key ? { ...c, items: result.metas, loading: false } : c))
+            )
             setHeroItems(prev => {
-              const next = [...prev, ...result.metas.slice(0, 5)]
+              const next = [...prev, ...result.metas.slice(0, 6)]
               return next
             })
             setHero(prev => prev || result.metas[0])
+          } else {
+            setCatalogs(prev => prev.filter(c => c.key !== key))
           }
         } catch {
-          setCatalogs(prev => prev.map(c =>
-            c.key === key ? { ...c, loading: false } : c
-          ))
+          setCatalogs(prev => prev.filter(c => c.key !== key))
         }
       })
     })
@@ -198,7 +234,7 @@ export default function Home() {
     if (heroVideoRef.current) clearInterval(heroVideoRef.current)
     heroVideoRef.current = setInterval(() => {
       setHeroIndex(prev => {
-        const next = (prev + 1) % heroItems.length
+        const next = (prev + 1) % Math.min(heroItems.length, 10)
         setHero(heroItems[next])
         return next
       })
@@ -227,9 +263,16 @@ export default function Home() {
 
       {/* Hero Section */}
       {hero && (
-        <div className="hero-section" style={{
-          backgroundImage: hero.background ? `url(${hero.background})` : hero.poster ? `url(${hero.poster})` : 'none'
-        }}>
+        <div
+          className="hero-section"
+          style={{
+            backgroundImage: hero.background
+              ? `url(${hero.background})`
+              : hero.poster
+              ? `url(${hero.poster})`
+              : 'none',
+          }}
+        >
           <div className="hero-gradient" />
           <div className="hero-content">
             <h1 className="hero-title">{hero.name}</h1>
@@ -240,14 +283,24 @@ export default function Home() {
               {hero.year && <span>{hero.year}</span>}
               {hero.imdbRating && <span>⭐ {hero.imdbRating}</span>}
               {hero.genres?.slice(0, 3).map(g => (
-                <span key={g} className="badge">{g}</span>
+                <span key={g} className="badge">
+                  {g}
+                </span>
               ))}
             </div>
             <div className="hero-actions">
-              <button className="btn btn-primary btn-lg" onClick={() => navigate(`/detail/${hero.type}/${encodeURIComponent(hero.id)}`)}>
+              <button
+                type="button"
+                className="btn btn-primary btn-lg"
+                onClick={() => navigate(`/detail/${hero.type}/${encodeURIComponent(hero.id)}`)}
+              >
                 ▶ Play
               </button>
-              <button className="btn btn-secondary btn-lg" onClick={() => navigate(`/detail/${hero.type}/${encodeURIComponent(hero.id)}`)}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-lg"
+                onClick={() => navigate(`/detail/${hero.type}/${encodeURIComponent(hero.id)}`)}
+              >
                 ℹ️ More Info
               </button>
             </div>
@@ -257,12 +310,14 @@ export default function Home() {
             <div className="hero-dots">
               {heroItems.slice(0, 8).map((_, i) => (
                 <button
+                  type="button"
                   key={i}
                   className={`hero-dot ${i === heroIndex ? 'hero-dot-active' : ''}`}
                   onClick={() => {
                     setHeroIndex(i)
                     setHero(heroItems[i])
                   }}
+                  title={`Slide ${i + 1}`}
                 />
               ))}
             </div>
@@ -280,7 +335,7 @@ export default function Home() {
           />
         ))}
 
-        {addons.length === 0 && (
+        {catalogs.length === 0 && addons.length === 0 && (
           <div className="empty-state">
             <p className="empty-state-icon">🧩</p>
             <h2>No addons installed</h2>

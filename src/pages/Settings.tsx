@@ -272,16 +272,34 @@ export default function Settings() {
               </button>
             </div>
           )}
-          <p className="settings-help">
-            Create an app at{' '}
-            <a href="https://simkl.com/settings/developer/new/" target="_blank" rel="noopener noreferrer">
-              simkl.com/settings/developer/new
-            </a>
-            {' '}and set the Redirect URI to{' '}
-            <code style={{ fontSize: '0.8em', background: 'rgba(255,255,255,0.08)', padding: '1px 6px', borderRadius: '4px' }}>
-              {window.location.origin}/settings
-            </code>
-          </p>
+          <div className="settings-help" style={{ marginTop: '0.75rem', lineHeight: '1.6' }}>
+            <p>
+              1. Open{' '}
+              <a href="https://simkl.com/settings/developer/new/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--neon-violet, #a855f7)', textDecoration: 'underline' }}>
+                simkl.com/settings/developer/new
+              </a>{' '}
+              (or edit your existing app).
+            </p>
+            <p style={{ marginTop: '0.25rem' }}>
+              2. Set <strong>Redirect URL</strong> to exactly:
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
+              <code style={{ fontSize: '0.85em', background: 'rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.12)' }}>
+                {window.location.origin}/settings
+              </code>
+              <button
+                type="button"
+                className="btn-ghost"
+                style={{ padding: '2px 8px', fontSize: '0.8rem' }}
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/settings`)
+                  setMessage({ text: '📋 Redirect URI copied to clipboard!', type: 'success' })
+                }}
+              >
+                Copy URL
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 

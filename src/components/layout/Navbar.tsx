@@ -34,11 +34,19 @@ export default function Navbar() {
     }
   }, [location.pathname, searchParams])
 
+  // Live debounced search from navbar if user types on any page
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20)
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
+    if (!searchQuery.trim()) return
+
+    const timer = setTimeout(() => {
+      const currentQ = searchParams.get('q') || ''
+      if (searchQuery.trim() !== currentQ) {
+        navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
+      }
+    }, 400)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery, searchParams, navigate])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -61,11 +69,13 @@ export default function Navbar() {
       </a>
 
       <form className={`navbar-search ${searchFocused ? 'focused' : ''}`} onSubmit={handleSearch} ref={searchRef}>
-        <span className="navbar-search-icon">🔍</span>
+        <button type="submit" className="navbar-search-icon-btn" title="Search">
+          🔍
+        </button>
         <input
           type="text"
           className="navbar-search-input"
-          placeholder="Search movies, shows..."
+          placeholder="Search movies, shows, anime..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
