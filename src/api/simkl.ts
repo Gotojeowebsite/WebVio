@@ -9,13 +9,17 @@ export interface SimklUser {
 }
 
 export interface WatchedPayload {
-  movies?: { ids: { imdb?: string; simkl?: number }; watched_at?: string }[];
+  movies?: { ids: { imdb?: string; simkl?: number; tmdb?: number }; watched_at?: string }[];
   shows?: {
-    ids: { imdb?: string; simkl?: number };
+    ids: { imdb?: string; simkl?: number; tmdb?: number };
     seasons?: {
       number: number;
       episodes?: { number: number; watched_at?: string }[];
     }[];
+  }[];
+  anime?: {
+    ids: { imdb?: string; simkl?: number; kitsu?: number };
+    episodes?: { number: number; watched_at?: string }[];
   }[];
 }
 

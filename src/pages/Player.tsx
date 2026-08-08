@@ -55,78 +55,80 @@ export default function Player() {
     ? loadProgress(currentVideo?.id || currentMeta.id)
     : 0
 
+  const triggerScrobble = useCallback(() => {
+    if (scrobbled.current || !currentMeta) return
+    scrobbled.current = true
+
+    const imdbId = currentMeta.id.startsWith('tt') ? currentMeta.id : undefined
+    const isKitsu = currentMeta.id.startsWith('kitsu:')
+    const kitsuParts = isKitsu ? currentMeta.id.replace('kitsu:', '').split(':') : []
+    const kitsuAnimeId = kitsuParts.length > 0 ? parseInt(kitsuParts[0], 10) : undefined
+    const episodeNum = currentVideo?.episode || (kitsuParts.length > 1 ? parseInt(kitsuParts[1], 10) : 1)
+
+    if (simklConnected && simklAccessToken && simklClientId) {
+      if (currentMeta.type === 'movie' && imdbId) {
+        markWatched(simklClientId, simklAccessToken, {
+          movies: [{ ids: { imdb: imdbId }, watched_at: new Date().toISOString() }],
+        }).catch((e) => console.warn('Simkl movie scrobble failed', e))
+      } else if (currentMeta.type === 'anime' || isKitsu) {
+        markWatched(simklClientId, simklAccessToken, {
+          anime: [{
+            ids: {
+              ...(imdbId ? { imdb: imdbId } : {}),
+              ...(kitsuAnimeId ? { kitsu: kitsuAnimeId } : {}),
+            },
+            episodes: [{ number: episodeNum, watched_at: new Date().toISOString() }],
+          }],
+        }).catch((e) => console.warn('Simkl anime scrobble failed', e))
+      } else if (currentVideo?.season && currentVideo?.episode && imdbId) {
+        markWatched(simklClientId, simklAccessToken, {
+          shows: [{
+            ids: { imdb: imdbId },
+            seasons: [{
+              number: currentVideo.season,
+              episodes: [{ number: currentVideo.episode, watched_at: new Date().toISOString() }],
+            }],
+          }],
+        }).catch((e) => console.warn('Simkl show scrobble failed', e))
+      }
+    }
+
+    if (traktConnected && traktAccessToken && traktClientId && imdbId) {
+      traktScrobbled.current = true
+      if (currentMeta.type === 'movie') {
+        markTraktWatched(traktClientId, traktAccessToken, {
+          movies: [{ title: currentMeta.name, year: currentMeta.year, ids: { imdb: imdbId }, watched_at: new Date().toISOString() }],
+        }).catch(() => {})
+      } else if (currentVideo?.season && currentVideo?.episode) {
+        markTraktWatched(traktClientId, traktAccessToken, {
+          shows: [{
+            title: currentMeta.name,
+            year: currentMeta.year,
+            ids: { imdb: imdbId },
+            seasons: [{
+              number: currentVideo.season,
+              episodes: [{ number: currentVideo.episode, watched_at: new Date().toISOString() }],
+            }],
+          }],
+        }).catch(() => {})
+      }
+    }
+  }, [currentMeta, currentVideo, simklConnected, simklAccessToken, simklClientId, traktConnected, traktAccessToken, traktClientId])
+
   const handleTimeUpdate = useCallback((time: number) => {
     updateTime(time)
 
-    // Simkl scrobble at 80% watched
+    // Scrobble at 75% watched
     const { duration } = usePlayerStore.getState()
-    if (
-      !scrobbled.current &&
-      simklConnected &&
-      simklAccessToken &&
-      simklClientId &&
-      currentMeta &&
-      duration > 0 &&
-      time / duration > 0.8
-    ) {
-      scrobbled.current = true
-      const imdbId = currentMeta.id.startsWith('tt') ? currentMeta.id : undefined
-      if (imdbId) {
-        if (currentMeta.type === 'movie') {
-          markWatched(simklClientId, simklAccessToken, {
-            movies: [{ ids: { imdb: imdbId }, watched_at: new Date().toISOString() }],
-          }).catch(() => {})
-        } else if (currentVideo?.season && currentVideo?.episode) {
-          markWatched(simklClientId, simklAccessToken, {
-            shows: [{
-              ids: { imdb: imdbId },
-              seasons: [{
-                number: currentVideo.season,
-                episodes: [{ number: currentVideo.episode, watched_at: new Date().toISOString() }],
-              }],
-            }],
-          }).catch(() => {})
-        }
-      }
+    if (!scrobbled.current && duration > 0 && time / duration > 0.75) {
+      triggerScrobble()
     }
-
-    // Trakt scrobble at 80% watched
-    if (
-      !traktScrobbled.current &&
-      traktConnected &&
-      traktAccessToken &&
-      traktClientId &&
-      currentMeta &&
-      duration > 0 &&
-      time / duration > 0.8
-    ) {
-      traktScrobbled.current = true
-      const imdbId = currentMeta.id.startsWith('tt') ? currentMeta.id : undefined
-      if (imdbId) {
-        if (currentMeta.type === 'movie') {
-          markTraktWatched(traktClientId, traktAccessToken, {
-            movies: [{ title: currentMeta.name, year: currentMeta.year, ids: { imdb: imdbId }, watched_at: new Date().toISOString() }],
-          }).catch(() => {})
-        } else if (currentVideo?.season && currentVideo?.episode) {
-          markTraktWatched(traktClientId, traktAccessToken, {
-            shows: [{
-              title: currentMeta.name,
-              year: currentMeta.year,
-              ids: { imdb: imdbId },
-              seasons: [{
-                number: currentVideo.season,
-                episodes: [{ number: currentVideo.episode, watched_at: new Date().toISOString() }],
-              }],
-            }],
-          }).catch(() => {})
-        }
-      }
-    }
-  }, [updateTime, simklConnected, simklAccessToken, simklClientId, traktConnected, traktAccessToken, traktClientId, currentMeta, currentVideo])
+  }, [updateTime, triggerScrobble])
 
   const handleEnded = useCallback(() => {
+    triggerScrobble()
     saveProgress()
-  }, [saveProgress])
+  }, [triggerScrobble, saveProgress])
 
   const handleBack = () => {
     saveProgress()
@@ -147,27 +149,12 @@ export default function Player() {
 
   return (
     <div className="player-page">
-      {/* Top bar */}
-      <div className="player-top-bar">
-        <button className="btn btn-ghost player-back" onClick={handleBack}>
-          ← Back
-        </button>
-        <div className="player-now-playing">
-          <p className="player-title">{currentMeta?.name || 'Playing'}</p>
-          {currentVideo && (
-            <p className="player-subtitle">
-              S{currentVideo.season}E{currentVideo.episode} - {currentVideo.title}
-            </p>
-          )}
-          {currentStream.quality && (
-            <span className="badge badge-hd">{currentStream.quality}</span>
-          )}
-        </div>
-      </div>
-
       <VideoPlayer
         src={currentStream.url}
-        title={currentStream.title}
+        title={currentMeta?.name || 'Playing'}
+        subtitle={currentVideo ? `S${currentVideo.season}E${currentVideo.episode} - ${currentVideo.title}` : undefined}
+        quality={currentStream.quality}
+        onBack={handleBack}
         onTimeUpdate={handleTimeUpdate}
         onDurationChange={setDuration}
         onEnded={handleEnded}

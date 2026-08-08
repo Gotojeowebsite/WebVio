@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAddonStore } from '../store/addon-store'
-import { AddonClient, Meta, Video } from '../api/addon-client'
+import { AddonClient, Meta } from '../api/addon-client'
 import StreamPicker from '../components/detail/StreamPicker'
 import './detail.css'
 
 export default function Detail() {
   const { type, id } = useParams<{ type: string; id: string }>()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { addons, loadFromStorage } = useAddonStore()
   const [meta, setMeta] = useState<Meta | null>(null)
@@ -48,6 +49,13 @@ export default function Detail() {
               if (result && result.meta) {
                 setMeta(result.meta)
                 setLoading(false)
+
+                // Check if an initial video was requested or default to first episode
+                const epParam = searchParams.get('episode')
+                if (epParam) {
+                  setSelectedVideoId(epParam)
+                  setStreamPickerOpen(true)
+                }
                 return
               }
             } catch {
@@ -62,28 +70,34 @@ export default function Detail() {
     }
 
     fetchMeta()
-  }, [type, id, addons, loadFromStorage])
+  }, [type, id, addons, loadFromStorage, searchParams])
 
   const handlePlay = (videoId?: string) => {
     if (!meta || !type) return
-    setSelectedVideoId(videoId || meta.id)
+    const targetVideoId = videoId || (meta.videos && meta.videos.length > 0 ? meta.videos[0].id : meta.id)
+    setSelectedVideoId(targetVideoId)
     setStreamPickerOpen(true)
   }
 
   // Get seasons from videos
   const seasons = meta?.videos
-    ? [...new Set(meta.videos.filter(v => v.season !== undefined).map(v => v.season!))]
-        .sort((a, b) => a - b)
+    ? [...new Set(meta.videos.filter(v => v.season !== undefined && v.season > 0).map(v => v.season!))].sort((a, b) => a - b)
     : []
 
-  const episodesInSeason = meta?.videos?.filter(v => v.season === selectedSeason) || []
+  const episodesInSeason = meta?.videos
+    ? seasons.length > 0
+      ? meta.videos.filter(v => v.season === selectedSeason)
+      : meta.videos
+    : []
+
+  const isShow = type === 'series' || type === 'anime' || type === 'tv' || (meta?.videos && meta.videos.length > 0)
 
   if (loading) {
     return (
       <div className="detail-page">
         <div className="detail-loading">
           <div className="loading-spinner" />
-          <p>Loading...</p>
+          <p>Loading metadata & streams...</p>
         </div>
       </div>
     )
@@ -103,7 +117,7 @@ export default function Detail() {
 
   return (
     <div className="detail-page">
-      {/* Hero */}
+      {/* Hero Header */}
       <div className="detail-hero" style={{
         backgroundImage: meta.background ? `url(${meta.background})` : meta.poster ? `url(${meta.poster})` : 'none'
       }}>
@@ -129,11 +143,9 @@ export default function Detail() {
           )}
 
           <div className="detail-actions">
-            {type === 'movie' && (
-              <button className="btn btn-primary btn-lg" onClick={() => handlePlay()}>
-                ▶ Play
-              </button>
-            )}
+            <button className="btn btn-primary btn-lg" onClick={() => handlePlay()}>
+              ▶ {isShow ? (episodesInSeason.length > 0 ? `Play S${selectedSeason}E1` : 'Play Episodes') : 'Play Movie'}
+            </button>
             <button className="btn btn-secondary btn-lg" onClick={() => navigate(-1)}>
               ← Back
             </button>
@@ -154,58 +166,63 @@ export default function Detail() {
           </div>
         )}
 
-        {/* Seasons & Episodes */}
-        {type === 'series' && seasons.length > 0 && (
+        {/* Seasons & Episodes Section for Series & Anime */}
+        {isShow && (
           <div className="detail-section">
-            <h3>Episodes</h3>
-
-            <div className="season-tabs">
-              {seasons.map(s => (
-                <button
-                  key={s}
-                  className={`tab-btn ${selectedSeason === s ? 'tab-active' : ''}`}
-                  onClick={() => setSelectedSeason(s)}
-                >
-                  Season {s}
-                </button>
-              ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0 }}>Episodes ({meta.videos?.length || 0})</h3>
+              <span style={{ fontSize: '0.85rem', color: 'var(--color-accent-primary, #a855f7)', fontWeight: 600 }}>
+                ⚡ Click any episode to open stream list
+              </span>
             </div>
+
+            {seasons.length > 1 && (
+              <div className="season-tabs">
+                {seasons.map(s => (
+                  <button
+                    key={s}
+                    className={`tab-btn ${selectedSeason === s ? 'tab-active' : ''}`}
+                    onClick={() => setSelectedSeason(s)}
+                  >
+                    Season {s}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="episode-list">
               {episodesInSeason
                 .sort((a, b) => (a.episode || 0) - (b.episode || 0))
-                .map(ep => (
-                <div key={ep.id} className="episode-item" onClick={() => handlePlay(ep.id)}>
+                .map((ep, idx) => (
+                <div
+                  key={ep.id || idx}
+                  className="episode-item"
+                  onClick={() => handlePlay(ep.id)}
+                  style={{ cursor: 'pointer', transition: 'all 0.2s ease' }}
+                >
                   <div className="episode-number">
-                    E{ep.episode}
+                    {ep.season && ep.episode ? `S${ep.season} E${ep.episode}` : `E${ep.episode || idx + 1}`}
                   </div>
                   <div className="episode-info">
-                    <h4 className="episode-title">{ep.title || `Episode ${ep.episode}`}</h4>
-                    {ep.overview && <p className="episode-overview">{ep.overview.substring(0, 120)}...</p>}
+                    <h4 className="episode-title">{ep.title || `Episode ${ep.episode || idx + 1}`}</h4>
+                    {ep.overview && <p className="episode-overview">{ep.overview.substring(0, 140)}...</p>}
                     {ep.released && (
                       <span className="episode-date">
                         {new Date(ep.released).toLocaleDateString()}
                       </span>
                     )}
                   </div>
-                  <button className="btn btn-primary btn-icon episode-play">▶</button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* For movies with no season/episode structure */}
-        {type === 'series' && seasons.length === 0 && meta.videos && meta.videos.length > 0 && (
-          <div className="detail-section">
-            <h3>Episodes</h3>
-            <div className="episode-list">
-              {meta.videos.map(v => (
-                <div key={v.id} className="episode-item" onClick={() => handlePlay(v.id)}>
-                  <div className="episode-info">
-                    <h4 className="episode-title">{v.title}</h4>
-                  </div>
-                  <button className="btn btn-primary btn-icon episode-play">▶</button>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-icon episode-play"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handlePlay(ep.id)
+                    }}
+                    title="Choose stream & play"
+                  >
+                    ▶
+                  </button>
                 </div>
               ))}
             </div>

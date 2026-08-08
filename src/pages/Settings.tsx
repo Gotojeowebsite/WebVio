@@ -48,9 +48,23 @@ export default function Settings() {
     if (!code || state) return
     if (simklConnected) return
 
-    const storedClientId = useAuthStore.getState().simklClientId
-    const storedSecret = useAuthStore.getState().simklClientSecret
-    if (!storedClientId || !storedSecret) return
+    const storedClientId =
+      useAuthStore.getState().simklClientId ||
+      localStorage.getItem('webvio_simkl_clientId') ||
+      simklIdInput.trim()
+    const storedSecret =
+      useAuthStore.getState().simklClientSecret ||
+      localStorage.getItem('webvio_simkl_clientSecret') ||
+      simklSecretInput.trim()
+
+    if (!storedClientId || !storedSecret) {
+      setMessage({
+        text: 'Simkl credentials missing. Please enter your Client ID & Secret and click Connect.',
+        type: 'error',
+      })
+      navigate('/settings', { replace: true })
+      return
+    }
 
     setSimklLoading(true)
     ;(async () => {
@@ -58,15 +72,18 @@ export default function Settings() {
         const { exchangeCode, getUser } = await import('../api/simkl')
         const redirectUri = window.location.origin + '/settings'
         const token = await exchangeCode(storedClientId, storedSecret, code, redirectUri)
+        if (!token) throw new Error('No access token received from Simkl')
         const user = await getUser(storedClientId, token)
         setSimklAuth(token, user)
-        setMessage({ text: '✅ Simkl connected!', type: 'success' })
-      } catch (err) {
+        setMessage({ text: '✅ Simkl successfully connected & synced!', type: 'success' })
+      } catch (err: any) {
         console.error('Simkl OAuth error:', err)
-        setMessage({ text: 'Simkl connection failed. Check your Client Secret.', type: 'error' })
+        setMessage({
+          text: `Simkl error: ${err.message || 'Check Client Secret and Redirect URI'}`,
+          type: 'error',
+        })
       } finally {
         setSimklLoading(false)
-        // Clean the code out of the URL
         navigate('/settings', { replace: true })
       }
     })()
@@ -242,24 +259,37 @@ export default function Settings() {
                   Save
                 </button>
               </div>
-              {simklClientId && simklClientSecret && (
-                <div className="settings-row">
-                  <button
-                    className="btn-primary"
-                    disabled={simklLoading}
-                    onClick={async () => {
+              <div className="settings-row">
+                <button
+                  className="btn-primary"
+                  style={{ width: '100%', justifyContent: 'center', marginTop: '0.25rem' }}
+                  disabled={simklLoading}
+                  onClick={async () => {
+                    const id = simklIdInput.trim()
+                    const secret = simklSecretInput.trim()
+                    if (!id || !secret) {
+                      setMessage({ text: 'Please enter both Client ID and Client Secret', type: 'error' })
+                      return
+                    }
+                    setSimklClientId(id)
+                    setSimklClientSecret(secret)
+                    localStorage.setItem('webvio_simkl_clientId', id)
+                    localStorage.setItem('webvio_simkl_clientSecret', secret)
+
+                    setSimklLoading(true)
+                    try {
                       const { getAuthUrl } = await import('../api/simkl')
-                      const url = getAuthUrl(
-                        simklClientId,
-                        window.location.origin + '/settings'
-                      )
+                      const url = getAuthUrl(id, window.location.origin + '/settings')
                       window.location.href = url
-                    }}
-                  >
-                    {simklLoading ? 'Connecting...' : 'Connect with Simkl'}
-                  </button>
-                </div>
-              )}
+                    } catch (err: any) {
+                      setSimklLoading(false)
+                      setMessage({ text: err.message || 'Failed to initialize Simkl login', type: 'error' })
+                    }
+                  }}
+                >
+                  {simklLoading ? 'Connecting to Simkl...' : '🔗 Connect with Simkl'}
+                </button>
+              </div>
             </>
           )}
           {simklConnected && simklUser && (

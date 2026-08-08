@@ -17,6 +17,12 @@ interface Props {
 
 type FilterTab = 'all' | 'cached' | 'direct'
 
+// Default high-performance stream providers
+const DEFAULT_STREAM_PROVIDERS = [
+  'https://torrentio.strem.fun/manifest.json',
+  'https://mediafusion.elfhosted.com/manifest.json',
+]
+
 export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: Props) {
   const navigate = useNavigate()
   const { addons } = useAddonStore()
@@ -36,28 +42,75 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
     const allStreams: EnrichedStream[] = []
     const enabledAddons = addons.filter(a => a.enabled)
 
-    // Fetch streams from all addons in parallel
+    // Combine user-installed addons with stream providers
+    const targetAddons = Array.from(
+      new Set([
+        ...enabledAddons.map(a => a.manifestUrl),
+        ...DEFAULT_STREAM_PROVIDERS,
+      ])
+    )
+
+    const normalizedTypes = [type, 'series', 'movie', 'anime', 'tv'].filter(Boolean) as string[]
+
+    // Fetch streams from all addons in parallel with 5s timeout
+    const fetchWithTimeout = async (promise: Promise<any>, ms = 5000) => {
+      let timer: any
+      const timeout = new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), ms)
+      })
+      try {
+        const res = await Promise.race([promise, timeout])
+        clearTimeout(timer)
+        return res
+      } catch {
+        clearTimeout(timer)
+        return null
+      }
+    }
+
     const results = await Promise.allSettled(
-      enabledAddons.map(async (addon) => {
-        const client = new AddonClient(addon.manifestUrl)
-        client.manifest = addon.manifest
-
-        if (!client.supportsResource('stream')) return []
-
+      targetAddons.map(async (url) => {
         try {
-          const result = await client.getStreams(type, videoId)
-          return (result.streams || []).map((s: Stream) => {
-            const info = parseStreamInfo(s)
-            return {
-              ...s,
-              addonName: addon.manifest.name,
-              addonId: addon.manifest.id,
-              quality: info.quality || undefined,
-              size: info.size || undefined,
-              codec: info.codec || undefined,
-              isCached: undefined,
-            } as EnrichedStream
-          })
+          const client = new AddonClient(url)
+          const installed = enabledAddons.find(a => a.manifestUrl === url)
+          let manifest = installed?.manifest
+
+          if (!manifest) {
+            try {
+              manifest = await client.loadManifest()
+            } catch {
+              // Ignore
+            }
+          } else {
+            client.manifest = manifest
+          }
+
+          const addonName = manifest?.name || (url.includes('torrentio') ? 'Torrentio' : url.includes('mediafusion') ? 'MediaFusion' : 'Stream Provider')
+          const addonId = manifest?.id || url
+
+          // Try primary type, then fallback
+          for (const tryType of normalizedTypes) {
+            try {
+              const res = await fetchWithTimeout(client.getStreams(tryType, videoId))
+              if (res && Array.isArray(res.streams) && res.streams.length > 0) {
+                return res.streams.map((s: Stream) => {
+                  const info = parseStreamInfo(s)
+                  return {
+                    ...s,
+                    addonName,
+                    addonId,
+                    quality: info.quality || undefined,
+                    size: info.size || undefined,
+                    codec: info.codec || undefined,
+                    isCached: undefined,
+                  } as EnrichedStream
+                })
+              }
+            } catch {
+              // Try next type
+            }
+          }
+          return []
         } catch {
           return []
         }
@@ -65,7 +118,7 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
     )
 
     for (const result of results) {
-      if (result.status === 'fulfilled') {
+      if (result.status === 'fulfilled' && Array.isArray(result.value)) {
         allStreams.push(...result.value)
       }
     }
@@ -77,31 +130,50 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
         .map(s => s.infoHash!)
 
       if (hashes.length > 0) {
-        const cached = await batchCheckCached(hashes, torboxApiKey)
-        for (const stream of allStreams) {
-          if (stream.infoHash) {
-            stream.isCached = cached[stream.infoHash.toLowerCase()] || false
+        try {
+          const cached = await batchCheckCached(hashes, torboxApiKey)
+          for (const stream of allStreams) {
+            if (stream.infoHash) {
+              stream.isCached = cached[stream.infoHash.toLowerCase()] || false
+            }
           }
+        } catch {
+          // Ignore cache check error
         }
       }
     }
 
-    // Sort: cached first, then by quality
+    // Deduplicate streams by infoHash / URL
+    const seen = new Set<string>()
+    const uniqueStreams: EnrichedStream[] = []
+    for (const s of allStreams) {
+      const key = s.infoHash || s.url || s.title || JSON.stringify(s)
+      if (!seen.has(key)) {
+        seen.add(key)
+        uniqueStreams.push(s)
+      }
+    }
+
+    // Sort: Direct/Free & Cached first, then by resolution (4K > 1080p > 720p)
     const qualityOrder: Record<string, number> = { '4K': 4, '1080p': 3, '720p': 2, '480p': 1 }
-    allStreams.sort((a, b) => {
-      // Direct URLs first (free)
+    uniqueStreams.sort((a, b) => {
+      // Direct URLs first
       if (a.url && !b.url) return -1
       if (!a.url && b.url) return 1
-      // Then cached
+      // Then cached torrents
       if (a.isCached && !b.isCached) return -1
       if (!a.isCached && b.isCached) return 1
       // Then quality
       const qa = qualityOrder[a.quality || ''] || 0
       const qb = qualityOrder[b.quality || ''] || 0
-      return qb - qa
+      if (qb !== qa) return qb - qa
+      // Then seeders
+      const sa = parseStreamInfo(a).seeders || 0
+      const sb = parseStreamInfo(b).seeders || 0
+      return sb - sa
     })
 
-    setStreams(allStreams)
+    setStreams(uniqueStreams)
     setLoading(false)
   }, [addons, type, videoId, torboxApiKey, torboxConnected])
 
@@ -112,7 +184,6 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
   }, [isOpen, fetchStreams])
 
   const handleStreamSelect = async (stream: EnrichedStream) => {
-    // External URL — open in new tab
     if (stream.externalUrl) {
       window.open(stream.externalUrl, '_blank')
       return
@@ -126,22 +197,41 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
       
       if (!url) {
         if (stream.infoHash && !torboxConnected) {
-          setError('Connect TorBox in Settings to play torrent streams, or pick a direct stream (🔗)')
+          setError('Connect TorBox in Settings to instantly stream torrents, or pick a direct stream (🔗)')
         } else {
-          setError('Could not resolve stream URL')
+          setError('Could not resolve stream URL. Try another stream.')
         }
         setResolving(null)
         return
       }
 
+      // Find or construct the exact Video / Episode metadata
+      const matchingVideo = meta.videos?.find(v => v.id === videoId) || (
+        videoId.includes(':') ? {
+          id: videoId,
+          title: `Episode ${videoId.split(':')[2] || videoId}`,
+          season: Number(videoId.split(':')[1]) || 1,
+          episode: Number(videoId.split(':')[2]) || 1,
+        } : null
+      )
+
       const info = parseStreamInfo(stream)
       setMeta(meta)
+      setVideo(matchingVideo)
+
+      const episodeLabel = matchingVideo?.season && matchingVideo?.episode
+        ? `S${matchingVideo.season}E${matchingVideo.episode}`
+        : matchingVideo?.episode
+        ? `Episode ${matchingVideo.episode}`
+        : ''
+
       setStream({
         url,
-        title: `${meta.name}${stream.behaviorHints?.filename ? ` - ${stream.behaviorHints.filename}` : ''}`,
+        title: `${meta.name}${episodeLabel ? ` • ${episodeLabel}` : ''}`,
         quality: info.quality || undefined,
         source: stream.addonName,
       })
+
       onClose()
       navigate('/player')
     } catch (err: any) {
@@ -162,6 +252,14 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
 
   if (!isOpen) return null
 
+  // Format episode title in header if videoId has episode info
+  const matchingVideo = meta.videos?.find(v => v.id === videoId)
+  const episodeHeader = matchingVideo?.season && matchingVideo?.episode
+    ? `Season ${matchingVideo.season} • Episode ${matchingVideo.episode}${matchingVideo.title ? ` - ${matchingVideo.title}` : ''}`
+    : videoId.includes(':')
+    ? `Season ${videoId.split(':')[1] || 1} • Episode ${videoId.split(':')[2] || 1}`
+    : meta.name
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="stream-picker-modal modal-content" onClick={e => e.stopPropagation()}>
@@ -169,7 +267,9 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
         <div className="modal-header">
           <div>
             <h3 className="stream-picker-title">Select a Stream</h3>
-            <p className="stream-picker-subtitle">{meta.name}</p>
+            <p className="stream-picker-subtitle" style={{ color: 'var(--color-accent-secondary, #f472b6)', fontWeight: 600 }}>
+              {episodeHeader}
+            </p>
           </div>
           <button className="modal-close btn-ghost" onClick={onClose}>✕</button>
         </div>
@@ -180,7 +280,7 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
             className={`stream-filter-tab ${filter === 'all' ? 'active' : ''}`}
             onClick={() => setFilter('all')}
           >
-            All ({streams.length})
+            All Streams ({streams.length})
           </button>
           <button
             className={`stream-filter-tab ${filter === 'cached' ? 'active' : ''}`}
@@ -192,7 +292,7 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
             className={`stream-filter-tab ${filter === 'direct' ? 'active' : ''}`}
             onClick={() => setFilter('direct')}
           >
-            🔗 Direct ({directCount})
+            🔗 Direct / Free ({directCount})
           </button>
         </div>
 
@@ -201,7 +301,7 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
           {loading && (
             <div className="stream-loading">
               <div className="loading-spinner" />
-              <p>Searching all addons for streams...</p>
+              <p>Searching stream providers & debrid caches for this episode...</p>
             </div>
           )}
 
@@ -213,8 +313,8 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
 
           {!loading && filteredStreams.length === 0 && (
             <div className="stream-empty">
-              <p>😔 No streams found</p>
-              <p className="text-sm text-muted">Try different addons or check your addon settings</p>
+              <p>😔 No streams found for this episode</p>
+              <p className="text-sm text-muted">Try connecting TorBox in Settings for instant debrid streaming</p>
             </div>
           )}
 
@@ -232,7 +332,6 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
                 >
                   <div className="stream-item-header">
                     <div className="stream-item-left">
-                      {/* Cache/type indicator */}
                       <span className="stream-type-icon">
                         {streamType === 'direct' && '🔗'}
                         {streamType === 'torrent' && (stream.isCached ? '⚡' : '🧲')}
@@ -246,21 +345,20 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
                            'Unknown Stream'}
                         </p>
                         <div className="stream-item-meta">
-                          {/* Badges */}
                           {info.quality && (
                             <span className={`badge ${info.quality === '4K' ? 'badge-4k' : 'badge-hd'}`}>
                               {info.quality}
                             </span>
                           )}
                           {stream.isCached && (
-                            <span className="badge badge-cached">CACHED</span>
+                            <span className="badge badge-cached">⚡ CACHED</span>
                           )}
                           {stream.isCached === false && stream.infoHash && (
                             <span className="badge badge-uncached">UNCACHED</span>
                           )}
                           {streamType === 'direct' && (
                             <span className="badge" style={{background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.3)'}}>
-                              FREE
+                              FREE DIRECT
                             </span>
                           )}
                           {info.codec && <span className="badge">{info.codec}</span>}
@@ -281,7 +379,6 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
                     {isResolving && <div className="loading-spinner stream-spinner" />}
                   </div>
 
-                  {/* Secondary info line from stream.title (often has more metadata) */}
                   {stream.title && stream.title.includes('\n') && (
                     <p className="stream-item-detail">
                       {stream.title.split('\n').slice(1).join(' • ')}
@@ -297,7 +394,7 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
         {!torboxConnected && streams.some(s => s.infoHash) && (
           <div className="stream-picker-footer">
             <p className="text-xs text-muted">
-              💡 Connect TorBox in Settings to unlock torrent streams. Direct streams (🔗) work for free!
+              💡 Connect your TorBox account in Settings to unlock high-speed torrent streams. Direct streams (🔗) play for free!
             </p>
           </div>
         )}

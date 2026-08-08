@@ -69,82 +69,120 @@ export default function Home() {
       setContinueLoading(true)
       try {
         if (simklConnected && simklAccessToken && simklClientId) {
-          // Fetch from Simkl — both shows and movies with "watching" status
+          // Fetch from Simkl — shows, movies, and anime
           const { getAllItems } = await import('../api/simkl')
 
-          const [showsData, moviesData] = await Promise.allSettled([
+          const [showsData, moviesData, animeData] = await Promise.allSettled([
             getAllItems(simklClientId, simklAccessToken, 'shows'),
             getAllItems(simklClientId, simklAccessToken, 'movies'),
+            getAllItems(simklClientId, simklAccessToken, 'anime'),
           ])
 
-          const watching: MetaPreview[] = []
+          const simklWatching: (MetaPreview & { lastWatchedAt?: number; video?: any; progressPercent?: number })[] = []
 
-          if (showsData.status === 'fulfilled') {
+          const parseItem = (item: any, defaultType: string) => {
+            const obj = item.show || item.movie || item.anime || item
+            if (!obj) return null
+            const imdbId = obj.ids?.imdb
+            const simklId = obj.ids?.simkl
+            const id = imdbId || (simklId ? `simkl-${simklId}` : null)
+            if (!id) return null
+
+            const poster = obj.poster
+              ? `https://simkl.in/posters/${obj.poster}_m.webp`
+              : (imdbId ? `https://images.metahub.space/poster/small/${imdbId}/img` : undefined)
+
+            const watchedAtTime = item.last_watched_at
+              ? new Date(item.last_watched_at).getTime()
+              : item.updated_at
+              ? new Date(item.updated_at).getTime()
+              : 0
+
+            // Extract last watched episode / season if available from Simkl
+            const season = item.season || item.last_watched_season || item.next_to_watch?.season
+            const episode = item.episode || item.last_watched_episode || item.next_to_watch?.episode
+
+            return {
+              id,
+              type: defaultType,
+              name: obj.title || obj.name || 'Untitled',
+              poster,
+              year: obj.year,
+              lastWatchedAt: watchedAtTime,
+              video: season || episode ? { season, episode } : null,
+              progressPercent: item.progress_percentage || (item.status === 'watching' ? 50 : undefined),
+            }
+          }
+
+          if (showsData.status === 'fulfilled' && Array.isArray(showsData.value)) {
             showsData.value
-              .filter((item: any) => item.status === 'watching')
+              .filter((item: any) => item.status === 'watching' || item.last_watched_at)
               .forEach((item: any) => {
-                watching.push({
-                  id: item.show?.ids?.imdb || `simkl-${item.show?.ids?.simkl}`,
-                  type: 'series',
-                  name: item.show?.title || 'Unknown',
-                  poster: item.show?.poster
-                    ? `https://simkl.in/posters/${item.show.poster}_m.webp`
-                    : undefined,
-                  year: item.show?.year,
-                })
+                const parsed = parseItem(item, 'series')
+                if (parsed) simklWatching.push(parsed)
               })
           }
 
-          if (moviesData.status === 'fulfilled') {
+          if (moviesData.status === 'fulfilled' && Array.isArray(moviesData.value)) {
             moviesData.value
-              .filter((item: any) => item.status === 'watching')
+              .filter((item: any) => item.status === 'watching' || item.last_watched_at)
               .forEach((item: any) => {
-                watching.push({
-                  id: item.movie?.ids?.imdb || `simkl-${item.movie?.ids?.simkl}`,
-                  type: 'movie',
-                  name: item.movie?.title || 'Unknown',
-                  poster: item.movie?.poster
-                    ? `https://simkl.in/posters/${item.movie.poster}_m.webp`
-                    : undefined,
-                  year: item.movie?.year,
-                })
+                const parsed = parseItem(item, 'movie')
+                if (parsed) simklWatching.push(parsed)
               })
           }
 
-          // Merge with local progress (local takes priority / appears first)
+          if (animeData.status === 'fulfilled' && Array.isArray(animeData.value)) {
+            animeData.value
+              .filter((item: any) => item.status === 'watching' || item.last_watched_at)
+              .forEach((item: any) => {
+                const parsed = parseItem(item, 'anime')
+                if (parsed) simklWatching.push(parsed)
+              })
+          }
+
+          // Merge with local progress (most recent watch timestamp takes priority)
           const localProgress = JSON.parse(localStorage.getItem('webvio_progress') || '{}')
-          const localItems: MetaPreview[] = Object.values(localProgress)
-            .sort((a: any, b: any) => b.updatedAt - a.updatedAt)
-            .slice(0, 10)
-            .map((p: any) => ({
+          const localItems: (MetaPreview & { lastWatchedAt?: number; video?: any; progressPercent?: number })[] =
+            Object.values(localProgress).map((p: any) => ({
               id: p.meta.id,
               type: p.meta.type,
               name: p.meta.name,
               poster: p.meta.poster,
+              lastWatchedAt: p.updatedAt || 0,
+              video: p.video || null,
+              progressPercent: p.duration > 0 ? Math.round((p.time / p.duration) * 100) : undefined,
             }))
 
-          // Merge: local first, then Simkl, deduplicate by id
+          // Merge and sort strictly by most recent watch first
           const seen = new Set<string>()
-          const merged: MetaPreview[] = []
-          for (const item of [...localItems, ...watching]) {
+          const merged: (MetaPreview & { video?: any; progressPercent?: number })[] = []
+
+          const combinedList = [...localItems, ...simklWatching].sort(
+            (a, b) => (b.lastWatchedAt || 0) - (a.lastWatchedAt || 0)
+          )
+
+          for (const item of combinedList) {
             if (item.id && !seen.has(item.id)) {
               seen.add(item.id)
               merged.push(item)
             }
           }
 
-          setContinueWatching(merged)
+          setContinueWatching(merged.slice(0, 20))
         } else {
-          // No Simkl — fall back to local progress only
+          // No Simkl — fall back to local progress only (most recent watch first)
           const progress = JSON.parse(localStorage.getItem('webvio_progress') || '{}')
-          const items: MetaPreview[] = Object.values(progress)
-            .sort((a: any, b: any) => b.updatedAt - a.updatedAt)
+          const items: (MetaPreview & { video?: any; progressPercent?: number })[] = Object.values(progress)
+            .sort((a: any, b: any) => (b.updatedAt || 0) - (a.updatedAt || 0))
             .slice(0, 20)
             .map((p: any) => ({
               id: p.meta.id,
               type: p.meta.type,
               name: p.meta.name,
               poster: p.meta.poster,
+              video: p.video || null,
+              progressPercent: p.duration > 0 ? Math.round((p.time / p.duration) * 100) : undefined,
             }))
           setContinueWatching(items)
         }
