@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Zap, Package, BarChart2, Tv, Link as LinkIcon, Blocks, ChevronUp, ChevronDown, Check, X, Trash2, GripVertical, Loader2 } from 'lucide-react'
 import { useAuthStore } from '../store/auth-store'
 import { useAddonStore } from '../store/addon-store'
+import { Toast } from '../components/ui/Toast'
 
 export default function Settings() {
   const {
@@ -132,8 +133,12 @@ export default function Settings() {
       <h1 className="page-title">Settings</h1>
 
       {message && (
-        <div className={`toast toast-${message.type}`}>
-          {message.text}
+        <div className="toast-container">
+          <Toast
+            message={message.text}
+            variant={message.type}
+            onClose={() => setMessage(null)}
+          />
         </div>
       )}
 
