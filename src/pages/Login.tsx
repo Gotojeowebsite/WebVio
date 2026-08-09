@@ -83,17 +83,17 @@ export default function Login() {
               </p>
 
               <div className="input-group">
-                <label className="input-label">Email</label>
-                <input className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" />
+                <label htmlFor="login-email" className="input-label">Email</label>
+                <input id="login-email" className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your@email.com" />
               </div>
               <div className="input-group">
-                <label className="input-label">Password</label>
-                <input className="input" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleNuvioLogin()} />
+                <label htmlFor="login-password" className="input-label">Password</label>
+                <input id="login-password" className="input" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" onKeyDown={e => e.key === 'Enter' && handleNuvioLogin()} />
               </div>
 
               <div className="input-group">
-                <label className="input-label">CORS Proxy URL (optional)</label>
-                <input className="input" type="text" value={corsProxy} onChange={e => setCorsProxyInput(e.target.value)} placeholder="https://your-proxy.workers.dev/?url=" />
+                <label htmlFor="login-cors" className="input-label">CORS Proxy URL (optional)</label>
+                <input id="login-cors" className="input" type="text" value={corsProxy} onChange={e => setCorsProxyInput(e.target.value)} placeholder="https://your-proxy.workers.dev/?url=" />
               </div>
 
               {error && <p className="login-error">{error}</p>}
@@ -128,7 +128,7 @@ export default function Login() {
                   <Package size={18} aria-hidden="true" /> TorBox <span className="badge">Optional</span>
                 </h4>
                 <p className="text-xs text-muted">Needed for torrent-based streams. Direct HTTP streams work without it.</p>
-                <input className="input" type="password" value={torboxKey} onChange={e => setTorboxKey(e.target.value)} placeholder="TorBox API Key" style={{ marginTop: '0.5rem' }} />
+                <input className="input" type="password" aria-label="TorBox API Key" value={torboxKey} onChange={e => setTorboxKey(e.target.value)} placeholder="TorBox API Key" style={{ marginTop: '0.5rem' }} />
               </div>
 
               <button
