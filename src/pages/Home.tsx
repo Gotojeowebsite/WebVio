@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Play, Info, Star, Cpu } from 'lucide-react'
+import { Play, Info, Star, Cpu, Blocks } from 'lucide-react'
 import { useAddonStore } from '../store/addon-store'
 import { useAuthStore } from '../store/auth-store'
 import { AddonClient, MetaPreview } from '../api/addon-client'
@@ -314,8 +314,8 @@ export default function Home() {
         </div>
       )}
 
-      {/* Hero Section */}
-      {hero && (
+      {/* Hero Section or Skeleton */}
+      {hero ? (
         <div className="hero-section">
           <div 
             className="hero-bg" 
@@ -328,6 +328,7 @@ export default function Home() {
             }}
           />
           <div className="hero-gradient" />
+          <div className="hero-gradient-cap" />
           <div className="hero-content">
             <h1 className="hero-title">{hero.name}</h1>
             {hero.description && (
@@ -390,6 +391,20 @@ export default function Home() {
             </div>
           )}
         </div>
+      ) : (
+        <div className="hero-skeleton">
+          <div className="hero-gradient" />
+          <div className="hero-gradient-cap" />
+          <div className="hero-content">
+            <div className="skeleton hero-skeleton-title" />
+            <div className="skeleton hero-skeleton-desc" />
+            <div className="skeleton hero-skeleton-meta" />
+            <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+              <div className="skeleton hero-skeleton-btn" />
+              <div className="skeleton hero-skeleton-btn" />
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="home-catalogs">
@@ -404,7 +419,7 @@ export default function Home() {
 
         {catalogs.length === 0 && addons.length === 0 && (
           <div className="empty-state">
-            <p className="empty-state-icon">🧩</p>
+            <Blocks size={48} aria-hidden="true" style={{ marginBottom: '16px', opacity: 0.5 }} />
             <h2>No addons installed</h2>
             <p>Go to Settings to login with Nuvio and load your addons</p>
             <button className="btn btn-primary" onClick={() => navigate('/settings')}>
