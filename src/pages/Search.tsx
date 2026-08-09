@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Search as SearchIcon, X, Film, Tv, Sparkles, Zap, Inbox } from 'lucide-react'
+import { Search as SearchIcon, X, Film, Tv, Sparkles, Zap, Inbox, Loader2 } from 'lucide-react'
 import { useAddonStore } from '../store/addon-store'
 import { AddonClient, MetaPreview } from '../api/addon-client'
 import MediaCard from '../components/catalog/MediaCard'
@@ -261,126 +261,95 @@ export default function Search() {
           <input
             type="text"
             className="input search-input-large"
-            placeholder="Search movies, series, anime (e.g. Demon Slayer, Attack on Titan, One Piece)..."
+            placeholder="Search movies, shows, anime..."
             value={inputValue}
-            aria-label="Search movies, series, anime"
+            aria-label="Search movies, shows, anime"
             onChange={(e) => setInputValue(e.target.value)}
             autoFocus
           />
-          {inputValue && (
-            <button
-              type="button"
-              className="btn-ghost search-clear"
-              aria-label="Clear search"
-              onClick={() => {
-                setInputValue('')
-                setResults([])
-                setSearchParams({})
-              }}
-            >
-              <X size={18} aria-hidden="true" />
-            </button>
+          {loading ? (
+            <Loader2 size={18} className="search-spinner-icon" aria-hidden="true" />
+          ) : (
+            inputValue && (
+              <button
+                type="button"
+                className="btn-ghost search-clear"
+                aria-label="Clear search"
+                onClick={() => {
+                  setInputValue('')
+                  setResults([])
+                  setSearchParams({})
+                }}
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            )
           )}
         </div>
       </form>
 
       {/* Category Filter Tabs */}
-      {results.length > 0 && !loading && (
-        <div
-          className="search-categories"
-          style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}
-        >
-          {[
-            { key: 'all', label: 'All Matches', count: results.length, icon: null },
-            { key: 'movie', label: 'Movies', count: movieCount, icon: Film },
-            { key: 'series', label: 'Series', count: seriesCount, icon: Tv },
-            { key: 'anime', label: 'Anime', count: animeCount, icon: Sparkles },
-          ].map((cat) => {
-            const Icon = cat.icon
-            return (
-              <button
-                key={cat.key}
-                type="button"
-                className={`btn-ghost ${activeCategory === cat.key ? 'active' : ''}`}
-                style={{
-                  borderRadius: '9999px',
-                  padding: '0.4rem 1.1rem',
-                  fontSize: '0.85rem',
-                  fontWeight: activeCategory === cat.key ? '600' : '400',
-                  border:
-                    activeCategory === cat.key
-                      ? '1px solid var(--color-accent-primary, #a855f7)'
-                      : '1px solid rgba(255,255,255,0.1)',
-                  background:
-                    activeCategory === cat.key
-                      ? 'rgba(168, 85, 247, 0.2)'
-                      : 'rgba(255,255,255,0.04)',
-                  color: activeCategory === cat.key ? '#fff' : 'var(--color-text-muted, #94a3b8)',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-                onClick={() => setActiveCategory(cat.key as CategoryFilter)}
-              >
-                {Icon && <Icon size={14} aria-hidden="true" />}
-                {cat.label} ({cat.count})
-              </button>
-            )
-          })}
-        </div>
-      )}
+      <div
+        className="search-categories"
+        style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}
+      >
+        {[
+          { key: 'all', label: 'All Matches', count: results.length, icon: null },
+          { key: 'movie', label: 'Movies', count: movieCount, icon: Film },
+          { key: 'series', label: 'Series', count: seriesCount, icon: Tv },
+          { key: 'anime', label: 'Anime', count: animeCount, icon: Sparkles },
+        ].map((cat) => {
+          const Icon = cat.icon
+          return (
+            <button
+              key={cat.key}
+              type="button"
+              className={`btn-ghost ${activeCategory === cat.key ? 'active' : ''}`}
+              style={{
+                borderRadius: '9999px',
+                padding: '0.4rem 1.1rem',
+                fontSize: '0.85rem',
+                fontWeight: activeCategory === cat.key ? '600' : '400',
+                border:
+                  activeCategory === cat.key
+                    ? '1px solid var(--accent-violet)'
+                    : '1px solid var(--border-subtle)',
+                background:
+                  activeCategory === cat.key
+                    ? 'rgba(139, 92, 246, 0.2)'
+                    : 'var(--bg-elevated)',
+                color: activeCategory === cat.key ? 'var(--text-primary)' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                transition: 'all var(--duration-fast) var(--ease-out)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              onClick={() => setActiveCategory(cat.key as CategoryFilter)}
+            >
+              {Icon && <Icon size={14} aria-hidden="true" />}
+              {cat.label} {results.length > 0 ? `(${cat.count})` : ''}
+            </button>
+          )
+        })}
+      </div>
 
+      {/* State 2: Loading State (12-card skeleton grid) */}
       {loading && results.length === 0 && (
-        <div className="search-loading">
-          <div className="loading-spinner" />
-          <p>Searching smart across all catalogs...</p>
+        <div className="media-grid">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div key={i} className="media-card skeleton" />
+          ))}
         </div>
       )}
 
+      {/* State 3: No Results State */}
       {!loading && query && filteredResults.length === 0 && (
-        <div className="search-empty">
-          <Inbox size={48} aria-hidden="true" style={{ marginBottom: '16px', opacity: 0.5 }} />
-          <h3>No relevant titles found for "{query}"</h3>
-          <p style={{ marginTop: '0.5rem', color: 'var(--color-text-muted, #94a3b8)' }}>
-            Try checking spelling or explore popular suggested searches below.
-          </p>
-        </div>
-      )}
-
-      {filteredResults.length > 0 && (
-        <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <p className="search-result-count" style={{ margin: 0 }}>
-              Found {filteredResults.length} relevant match{filteredResults.length !== 1 ? 'es' : ''} for "{query}"
-            </p>
-            {loading && (
-              <span style={{ fontSize: '0.8rem', color: 'var(--color-accent-primary, #a855f7)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <Zap size={14} aria-hidden="true" /> Scanning more catalogs...
-              </span>
-            )}
-          </div>
-          <div className="media-grid">
-            {filteredResults.map((item) => (
-              <MediaCard key={item.id} item={item} />
-            ))}
-          </div>
-        </>
-      )}
-
-      {(!query || (filteredResults.length === 0 && !loading)) && (
-        <div className="search-empty" style={{ textAlign: 'center', marginTop: query ? '2rem' : '0' }}>
-          {!query && <Film size={48} aria-hidden="true" style={{ marginBottom: '16px', opacity: 0.5 }} />}
-          <h3>{!query ? 'Smart Instant Search' : 'Popular Suggestions'}</h3>
-          <p
-            style={{
-              color: 'var(--color-text-muted, #94a3b8)',
-              maxWidth: '440px',
-              margin: '0.5rem auto 1.5rem',
-            }}
-          >
-            Instant relevance-ranked search across movies, TV series, and anime with typo tolerance.
+        <div className="search-empty" style={{ textAlign: 'center', padding: 'var(--space-12) 0' }}>
+          <Inbox size={48} aria-hidden="true" style={{ marginBottom: 'var(--space-4)', opacity: 0.4 }} />
+          <h3>No results found for "{query}"</h3>
+          <p style={{ marginTop: 'var(--space-2)', color: 'var(--text-muted)', maxWidth: '480px', margin: 'var(--space-2) auto var(--space-6)' }}>
+            Try checking your spelling or enable more addons in Settings.
           </p>
           <div
             style={{
@@ -401,11 +370,81 @@ export default function Search() {
                   borderRadius: '9999px',
                   padding: '0.45rem 1rem',
                   fontSize: '0.85rem',
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-subtle)',
                   cursor: 'pointer',
-                  color: 'var(--color-text-primary, #f8fafc)',
-                  transition: 'all 0.2s ease',
+                  color: 'var(--text-primary)',
+                  transition: 'all var(--duration-fast) var(--ease-out)',
+                }}
+                onClick={() => handleSuggestionClick(title)}
+              >
+                {title}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Results State */}
+      {filteredResults.length > 0 && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+            <p className="search-result-count" style={{ margin: 0 }}>
+              Found {filteredResults.length} relevant match{filteredResults.length !== 1 ? 'es' : ''} for "{query}"
+            </p>
+            {loading && (
+              <span style={{ fontSize: '0.8rem', color: 'var(--accent-violet)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <Zap size={14} aria-hidden="true" /> Scanning more catalogs...
+              </span>
+            )}
+          </div>
+          <div className="media-grid">
+            {filteredResults.map((item) => (
+              <MediaCard key={item.id} item={item} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* State 1: Idle / Initial State */}
+      {!query && !loading && (
+        <div className="search-empty" style={{ textAlign: 'center', marginTop: 'var(--space-4)' }}>
+          <Film size={48} aria-hidden="true" style={{ marginBottom: 'var(--space-4)', opacity: 0.4 }} />
+          <h3>Search movies, shows, anime...</h3>
+          <p
+            style={{
+              color: 'var(--text-muted)',
+              maxWidth: '460px',
+              margin: 'var(--space-2) auto var(--space-6)',
+              lineHeight: 1.5,
+            }}
+          >
+            Explore instant relevance-ranked search across all your installed catalogs.
+          </p>
+          <div
+            style={{
+              display: 'flex',
+              gap: '0.6rem',
+              justifyContent: 'center',
+              flexWrap: 'wrap',
+              maxWidth: '680px',
+              margin: '0 auto',
+            }}
+          >
+            {POPULAR_SUGGESTIONS.map((title) => (
+              <button
+                key={title}
+                type="button"
+                className="btn-ghost"
+                style={{
+                  borderRadius: '9999px',
+                  padding: '0.45rem 1rem',
+                  fontSize: '0.85rem',
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-subtle)',
+                  cursor: 'pointer',
+                  color: 'var(--text-primary)',
+                  transition: 'all var(--duration-fast) var(--ease-out)',
                 }}
                 onClick={() => handleSuggestionClick(title)}
               >
