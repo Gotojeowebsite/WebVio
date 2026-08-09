@@ -64,7 +64,7 @@ export default function MediaCard({ item }: Props) {
             position: 'absolute',
             top: '10px',
             right: '10px',
-            background: 'linear-gradient(135deg, var(--accent-violet), var(--accent-magenta))',
+            background: 'linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-secondary))',
             color: '#fff',
             fontSize: '0.72rem',
             fontWeight: 800,
@@ -86,12 +86,12 @@ export default function MediaCard({ item }: Props) {
           alt={item.name}
           loading="lazy"
           onError={() => setImgError(true)}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease', pointerEvents: 'none', background: 'var(--bg-elevated)' }}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease', pointerEvents: 'none', background: 'var(--color-bg-elevated)' }}
         />
       ) : (
-        <div className="media-poster-fallback" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', pointerEvents: 'none', background: 'var(--bg-elevated)' }}>
+        <div className="media-poster-fallback" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-muted)', pointerEvents: 'none', background: 'var(--color-bg-elevated)' }}>
           <Film size={36} aria-hidden="true" style={{ marginBottom: '0.8rem', opacity: 0.5 }} />
-          <span style={{ fontWeight: 600, fontSize: '0.9rem', lineHeight: '1.4', padding: '0 12px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+          <span style={{ fontWeight: 600, fontSize: '0.9rem', lineHeight: '1.4', padding: '0 12px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
             {item.name}
           </span>
         </div>
@@ -122,30 +122,11 @@ export default function MediaCard({ item }: Props) {
         </div>
       )}
 
-      <div 
-        className="media-card-overlay"
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          padding: '24px 16px 16px',
-          background: 'linear-gradient(to top, rgba(10,10,15,0.95) 0%, rgba(10,10,15,0.8) 50%, transparent 100%)',
-          backdropFilter: 'blur(4px)',
-          WebkitBackdropFilter: 'blur(4px)',
-          opacity: 0,
-          transform: 'translateY(10px)',
-          transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) 0.15s',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'flex-end',
-          pointerEvents: 'none',
-        }}
-      >
-        <p className="media-title" style={{ margin: '0 0 8px 0', fontSize: '1rem', fontWeight: 700, color: '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.5)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      <div className="media-card-overlay">
+        <p className="media-title">
           {item.name}
         </p>
-        <div className="media-meta" style={{ display: 'flex', gap: '8px', fontSize: '0.75rem', color: '#ccc', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="media-meta">
           {item.year && <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>{item.year}</span>}
           {item.imdbRating && <span style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(245, 197, 24, 0.1)', color: '#f5c518', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>⭐ {item.imdbRating}</span>}
           {item.type && <span className="badge badge-small" style={{ textTransform: 'capitalize', background: 'rgba(108, 92, 231, 0.2)', color: '#a29bfe', padding: '2px 6px', borderRadius: '4px' }}>{item.type}</span>}

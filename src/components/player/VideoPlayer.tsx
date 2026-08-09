@@ -120,6 +120,8 @@ export default function VideoPlayer({
   const [subSize, setSubSize] = useState<'normal' | 'large' | 'xlarge'>('normal')
   const [showSubMenu, setShowSubMenu] = useState(false)
   const [showAudioMenu, setShowAudioMenu] = useState(false)
+  const [hoverTime, setHoverTime] = useState<number | null>(null)
+  const [hoverPos, setHoverPos] = useState<number>(0)
 
   // Audio Tracks (HLS)
   const [audioTracks, setAudioTracks] = useState<{ id: number; name: string; lang: string }[]>([])
@@ -138,6 +140,7 @@ export default function VideoPlayer({
     video.volume = Math.max(0, Math.min(1, volume))
     video.muted = isMuted
   }, [volume, isMuted])
+
 
   // Initialize Video & Robust Stream Pipeline
   useEffect(() => {
@@ -281,8 +284,7 @@ export default function VideoPlayer({
     const match = activeCues.find(cue => adjustedTime >= cue.start && adjustedTime <= cue.end)
     setCurrentSubtitleText(match ? match.text : '')
   }, [currentTime, activeCues, subOffset])
-
-  // Hide controls on idle
+  // Hide controls on idle (3s)
   const handleMouseMove = useCallback(() => {
     setShowControls(true)
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current)
@@ -290,7 +292,7 @@ export default function VideoPlayer({
       setShowControls(false)
       setShowSubMenu(false)
       setShowAudioMenu(false)
-    }, 3500)
+    }, 3000)
   }, [])
 
   useEffect(() => {
@@ -480,6 +482,12 @@ export default function VideoPlayer({
       ref={containerRef}
       onMouseMove={handleMouseMove}
       onClick={() => setShowControls(true)}
+      onTouchStart={(e) => {
+        if (!(e.target as HTMLElement).closest('button, .video-progress-container, .volume-slider, .player-popover')) {
+          setShowControls(prev => !prev)
+          handleMouseMove()
+        }
+      }}
       onDoubleClick={toggleFullscreen}
       onMouseLeave={() => isPlaying && setShowControls(false)}
     >
@@ -672,7 +680,38 @@ export default function VideoPlayer({
         )}
 
         <div className="video-bottom-controls">
-          <div className="video-progress-container" onClick={handleSeek} role="slider" aria-label="Video timeline" aria-valuenow={currentTime} aria-valuemin={0} aria-valuemax={duration || 0}>
+          <div 
+            className="video-progress-container" 
+            onClick={handleSeek}
+            onMouseMove={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect()
+              const pos = (e.clientX - rect.left) / rect.width
+              const clampedPos = Math.max(0, Math.min(1, pos))
+              setHoverPos(clampedPos * 100)
+              setHoverTime(clampedPos * (duration || 0))
+            }}
+            onMouseLeave={() => setHoverTime(null)}
+            role="slider" 
+            tabIndex={0}
+            aria-label="Video timeline" 
+            aria-valuenow={currentTime} 
+            aria-valuemin={0} 
+            aria-valuemax={duration || 0}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight') {
+                e.preventDefault()
+                skipSeconds(10)
+              } else if (e.key === 'ArrowLeft') {
+                e.preventDefault()
+                skipSeconds(-10)
+              }
+            }}
+          >
+            {hoverTime !== null && (
+              <div className="scrub-tooltip" style={{ left: `${hoverPos}%` }}>
+                {formatTime(hoverTime)}
+              </div>
+            )}
             <div className="video-progress-bar" style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}>
               <div className="video-progress-thumb" />
             </div>

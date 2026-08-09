@@ -156,9 +156,39 @@
   overflow: visible;
 }
 
+.video-progress-container::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  bottom: -12px;
+  left: 0;
+  right: 0;
+  z-index: 1;
+}
+
+.scrub-tooltip {
+  position: absolute;
+  bottom: 18px;
+  transform: translateX(-50%);
+  background: rgba(15, 15, 22, 0.95);
+  border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-family: monospace;
+  font-weight: 600;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: var(--shadow-md);
+  z-index: 10;
+}
+
 .video-progress-bar {
   height: 100%;
-  background: var(--color-accent-gradient);
+  background: linear-gradient(90deg, var(--accent-violet), var(--accent-magenta));
   border-radius: 3px;
   position: relative;
   pointer-events: none;
@@ -177,8 +207,17 @@
   transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-.video-progress-container:hover .video-progress-thumb {
+.video-progress-container:hover .video-progress-thumb,
+.video-progress-container:focus-visible .video-progress-thumb {
   transform: scale(1);
+}
+
+.video-progress-container:focus-visible,
+.player-back-btn:focus-visible,
+.control-btn:focus-visible,
+.popover-item:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 /* Buttons and Actions */
