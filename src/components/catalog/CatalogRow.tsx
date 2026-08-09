@@ -14,10 +14,23 @@ export default function CatalogRow({ title, items, loading }: Props) {
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(true)
   const [isDragging, setIsDragging] = useState(false)
+  const [skeletonCount, setSkeletonCount] = useState(6)
   const isMouseDownRef = useRef(false)
   const startXRef = useRef(0)
   const scrollLeftRef = useRef(0)
   const hasMovedRef = useRef(false)
+
+  // Dynamic skeleton count based on container / viewport width
+  useEffect(() => {
+    const updateSkeletonCount = () => {
+      const w = scrollRef.current?.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 1200)
+      const cardWidth = w >= 1024 ? 211 : w >= 640 ? 191 : 166
+      setSkeletonCount(Math.max(3, Math.ceil(w / cardWidth) + 1))
+    }
+    updateSkeletonCount()
+    window.addEventListener('resize', updateSkeletonCount)
+    return () => window.removeEventListener('resize', updateSkeletonCount)
+  }, [])
 
   const checkScrollBounds = useCallback(() => {
     if (!scrollRef.current) return
@@ -132,7 +145,7 @@ export default function CatalogRow({ title, items, loading }: Props) {
             {title}
           </h3>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '16px 24px', color: 'var(--text-muted)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '16px 24px', color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)' }}>
           <Inbox size={20} aria-hidden="true" />
           <span>No results from this catalog</span>
         </div>
@@ -147,31 +160,9 @@ export default function CatalogRow({ title, items, loading }: Props) {
           <span className="catalog-title-accent"></span>
           {title}
         </h3>
-        <div className="catalog-arrows">
-          <button
-            type="button"
-            className="btn-ghost btn-icon catalog-arrow"
-            onClick={() => scroll('left')}
-            style={{ opacity: canScrollLeft ? 1 : 0.4 }}
-            aria-label="Scroll left"
-            title="Scroll left"
-          >
-            <ChevronLeft size={20} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className="btn-ghost btn-icon catalog-arrow"
-            onClick={() => scroll('right')}
-            style={{ opacity: canScrollRight ? 1 : 0.4 }}
-            aria-label="Scroll right"
-            title="Scroll right"
-          >
-            <ChevronRight size={20} aria-hidden="true" />
-          </button>
-        </div>
       </div>
 
-      <div className="catalog-scroll-wrapper">
+      <div className="catalog-row-relative-wrapper">
         {/* Floating Left Hover Chevron */}
         <button
           type="button"
@@ -192,7 +183,7 @@ export default function CatalogRow({ title, items, loading }: Props) {
           onMouseDown={handleMouseDown}
         >
           {loading
-            ? Array.from({ length: 8 }).map((_, i) => (
+            ? Array.from({ length: skeletonCount }).map((_, i) => (
                 <div key={i} className="catalog-card-item">
                   <div className="media-card skeleton" />
                 </div>
