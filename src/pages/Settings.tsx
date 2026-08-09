@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Zap, Package, BarChart2, Tv, Link as LinkIcon, Blocks, ChevronUp, ChevronDown, Check, X, Trash2, GripVertical } from 'lucide-react'
+import { Zap, Package, BarChart2, Tv, Link as LinkIcon, Blocks, ChevronUp, ChevronDown, Check, X, Trash2, GripVertical, Loader2 } from 'lucide-react'
 import { useAuthStore } from '../store/auth-store'
 import { useAddonStore } from '../store/addon-store'
 
@@ -31,7 +31,9 @@ export default function Settings() {
   const [addonLoading, setAddonLoading] = useState(false)
   const [torboxLoading, setTorboxLoading] = useState(false)
   const [simklLoading, setSimklLoading] = useState(false)
+  const [traktLoading, setTraktLoading] = useState(false)
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [addonAnnouncement, setAddonAnnouncement] = useState('')
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
   useEffect(() => {
@@ -140,16 +142,27 @@ export default function Settings() {
         <h2 className="settings-section-title">
           <span className="settings-icon"><Zap size={20} aria-hidden="true" /></span>
           Nuvio Account
+          {nuvioLoggedIn ? (
+            <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <span className="status-dot connected" /> Connected
+            </span>
+          ) : (
+            <span className="badge">Disconnected</span>
+          )}
         </h2>
-        <div className="card-glass settings-card">
+        <div className={`card-glass settings-card ${nuvioLoggedIn ? 'state-connected' : 'state-disconnected'}`}>
           <div className="settings-row">
             <div>
               <p className="settings-label">Logged in as</p>
               <p className="settings-value">{nuvioEmail || 'Not logged in'}</p>
             </div>
-            {nuvioLoggedIn && (
+            {nuvioLoggedIn ? (
               <button className="btn-secondary" onClick={handleLogout}>
-                Logout
+                Disconnect / Logout
+              </button>
+            ) : (
+              <button className="btn-primary" onClick={() => navigate('/login')}>
+                Connect Nuvio
               </button>
             )}
           </div>
@@ -171,10 +184,20 @@ export default function Settings() {
         <h2 className="settings-section-title">
           <span className="settings-icon"><Package size={20} aria-hidden="true" /></span>
           TorBox
-          {torboxConnected && <span className="badge badge-success">Connected</span>}
+          {torboxConnected ? (
+            <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <span className="status-dot connected" /> Connected
+            </span>
+          ) : torboxLoading ? (
+            <span className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <span className="status-dot connecting" /> Connecting...
+            </span>
+          ) : (
+            <span className="badge">Disconnected</span>
+          )}
           <span className="settings-subtitle">Optional — needed for torrent streams</span>
         </h2>
-        <div className="card-glass settings-card">
+        <div className={`card-glass settings-card ${torboxConnected ? 'state-connected' : torboxLoading ? 'state-connecting' : 'state-disconnected'}`}>
           <div className="settings-row">
             <input
               type="password"
@@ -182,6 +205,7 @@ export default function Settings() {
               placeholder="TorBox API Key"
               value={torboxKeyInput}
               aria-label="TorBox API Key"
+              disabled={torboxLoading}
               onChange={(e) => setTorboxKeyInput(e.target.value)}
               style={{ flex: 1 }}
             />
@@ -189,7 +213,9 @@ export default function Settings() {
               className="btn-primary"
               onClick={handleTorboxConnect}
               disabled={torboxLoading}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             >
+              {torboxLoading && <Loader2 size={16} className="search-spinner-icon" aria-hidden="true" />}
               {torboxLoading ? 'Connecting...' : torboxConnected ? 'Update' : 'Connect'}
             </button>
             {torboxConnected && (
@@ -220,11 +246,20 @@ export default function Settings() {
         <h2 className="settings-section-title">
           <span className="settings-icon"><BarChart2 size={20} aria-hidden="true" /></span>
           Simkl Tracking
-          {simklConnected && <span className="badge badge-success">Connected</span>}
-          {simklLoading && <span className="badge">Connecting...</span>}
+          {simklConnected ? (
+            <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <span className="status-dot connected" /> Connected
+            </span>
+          ) : simklLoading ? (
+            <span className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <span className="status-dot connecting" /> Connecting...
+            </span>
+          ) : (
+            <span className="badge">Disconnected</span>
+          )}
           <span className="settings-subtitle">Optional — for watch history tracking</span>
         </h2>
-        <div className="card-glass settings-card">
+        <div className={`card-glass settings-card ${simklConnected ? 'state-connected' : simklLoading ? 'state-connecting' : 'state-disconnected'}`}>
           {!simklConnected && (
             <>
               <div className="settings-row">
@@ -234,6 +269,7 @@ export default function Settings() {
                   placeholder="Simkl Client ID"
                   value={simklIdInput}
                   aria-label="Simkl Client ID"
+                  disabled={simklLoading}
                   onChange={(e) => setSimklIdInput(e.target.value)}
                   style={{ flex: 1 }}
                 />
@@ -245,11 +281,13 @@ export default function Settings() {
                   placeholder="Simkl Client Secret"
                   value={simklSecretInput}
                   aria-label="Simkl Client Secret"
+                  disabled={simklLoading}
                   onChange={(e) => setSimklSecretInput(e.target.value)}
                   style={{ flex: 1 }}
                 />
                 <button
                   className="btn-secondary"
+                  disabled={simklLoading}
                   onClick={() => {
                     if (!simklIdInput.trim() || !simklSecretInput.trim()) {
                       setMessage({ text: 'Enter both Client ID and Client Secret', type: 'error' })
@@ -291,7 +329,7 @@ export default function Settings() {
                     }
                   }}
                 >
-                  <LinkIcon size={16} aria-hidden="true" />
+                  {simklLoading ? <Loader2 size={16} className="search-spinner-icon" aria-hidden="true" /> : <LinkIcon size={16} aria-hidden="true" />}
                   {simklLoading ? 'Connecting to Simkl...' : 'Connect with Simkl'}
                 </button>
               </div>
@@ -310,7 +348,7 @@ export default function Settings() {
           <div className="settings-help" style={{ marginTop: '0.75rem', lineHeight: '1.6' }}>
             <p>
               1. Open{' '}
-              <a href="https://simkl.com/settings/developer/new/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-primary, #a855f7)', textDecoration: 'underline' }}>
+              <a href="https://simkl.com/settings/developer/new/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-violet)', textDecoration: 'underline' }}>
                 simkl.com/settings/developer/new
               </a>{' '}
               (or edit your existing app).
@@ -343,10 +381,20 @@ export default function Settings() {
         <h2 className="settings-section-title">
           <span className="settings-icon"><Tv size={20} aria-hidden="true" /></span>
           Trakt Tracking
-          {traktConnected && <span className="badge badge-success">Connected</span>}
+          {traktConnected ? (
+            <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <span className="status-dot connected" /> Connected
+            </span>
+          ) : traktLoading ? (
+            <span className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <span className="status-dot connecting" /> Connecting...
+            </span>
+          ) : (
+            <span className="badge">Disconnected</span>
+          )}
           <span className="settings-subtitle">Optional — for watch history tracking</span>
         </h2>
-        <div className="card-glass settings-card">
+        <div className={`card-glass settings-card ${traktConnected ? 'state-connected' : traktLoading ? 'state-connecting' : 'state-disconnected'}`}>
           <div className="settings-row">
             <input
               type="text"
@@ -354,11 +402,13 @@ export default function Settings() {
               placeholder="Trakt Client ID"
               value={traktIdInput}
               aria-label="Trakt Client ID"
+              disabled={traktLoading}
               onChange={(e) => setTraktIdInput(e.target.value)}
               style={{ flex: 1 }}
             />
             <button
               className="btn-secondary"
+              disabled={traktLoading}
               onClick={() => {
                 setTraktClientId(traktIdInput.trim())
                 setMessage({ text: 'Trakt Client ID saved', type: 'success' })
@@ -371,16 +421,22 @@ export default function Settings() {
             <div className="settings-row">
               <button
                 className="btn-primary"
+                disabled={traktLoading}
                 onClick={async () => {
-                  const { getTraktAuthUrl } = await import('../api/trakt')
-                  const url = getTraktAuthUrl(
-                    traktClientId,
-                    window.location.origin + '/settings'
-                  )
-                  window.location.href = url
+                  setTraktLoading(true)
+                  try {
+                    const { getTraktAuthUrl } = await import('../api/trakt')
+                    const url = getTraktAuthUrl(
+                      traktClientId,
+                      window.location.origin + '/settings'
+                    )
+                    window.location.href = url
+                  } catch {
+                    setTraktLoading(false)
+                  }
                 }}
               >
-                Connect with Trakt
+                {traktLoading ? 'Connecting to Trakt...' : 'Connect with Trakt'}
               </button>
             </div>
           )}
@@ -465,6 +521,11 @@ export default function Settings() {
           </div>
         </div>
 
+        {/* Screen Reader Announcement for Addon Position */}
+        <div aria-live="polite" className="sr-only">
+          {addonAnnouncement}
+        </div>
+
         <div className="addon-list">
           {addons.map((addon, index) => (
             <div
@@ -475,6 +536,7 @@ export default function Settings() {
               onDrop={() => {
                 if (draggedIndex !== null && draggedIndex !== index) {
                   reorderAddons(draggedIndex, index)
+                  setAddonAnnouncement(`Reordered ${addon.manifest.name} to position ${index + 1}`)
                   setDraggedIndex(null)
                 }
               }}
@@ -509,9 +571,12 @@ export default function Settings() {
               <div className="addon-actions">
                 <button
                   className="btn-ghost"
-                  onClick={() => moveAddonUp(index)}
+                  onClick={() => {
+                    moveAddonUp(index)
+                    setAddonAnnouncement(`Moved ${addon.manifest.name} up to position ${index}`)
+                  }}
                   disabled={index === 0}
-                  aria-label="Move addon up"
+                  aria-label={`Move ${addon.manifest.name} up`}
                   title="Move Up"
                   style={{ opacity: index === 0 ? 0.3 : 1 }}
                 >
@@ -519,9 +584,12 @@ export default function Settings() {
                 </button>
                 <button
                   className="btn-ghost"
-                  onClick={() => moveAddonDown(index)}
+                  onClick={() => {
+                    moveAddonDown(index)
+                    setAddonAnnouncement(`Moved ${addon.manifest.name} down to position ${index + 2}`)
+                  }}
                   disabled={index === addons.length - 1}
-                  aria-label="Move addon down"
+                  aria-label={`Move ${addon.manifest.name} down`}
                   title="Move Down"
                   style={{ opacity: index === addons.length - 1 ? 0.3 : 1 }}
                 >
@@ -530,14 +598,17 @@ export default function Settings() {
                 <button
                   className="btn-ghost"
                   onClick={() => toggleAddon(addon.manifestUrl)}
-                  aria-label={addon.enabled ? 'Disable addon' : 'Enable addon'}
+                  aria-label={addon.enabled ? `Disable ${addon.manifest.name}` : `Enable ${addon.manifest.name}`}
                   title={addon.enabled ? 'Disable addon' : 'Enable addon'}
                 >
                   {addon.enabled ? <Check size={18} color="#34d399" aria-hidden="true" /> : <X size={18} color="#ef4444" aria-hidden="true" />}
                 </button>
                 <button
                   className="btn-ghost btn-danger"
-                  onClick={() => removeAddon(addon.manifestUrl)}
+                  onClick={() => {
+                    removeAddon(addon.manifestUrl)
+                    setAddonAnnouncement(`Removed ${addon.manifest.name}`)
+                  }}
                   aria-label={`Remove addon ${addon.manifest.name}`}
                   title="Remove addon"
                 >

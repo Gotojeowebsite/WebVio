@@ -125,27 +125,27 @@ export default function Library() {
     <div className="page library-page">
       <h1 className="page-title">My Library</h1>
 
-      {/* Source Toggle */}
-      <div className="library-type-tabs" style={{ marginBottom: '1.5rem' }}>
-        {nuvioLoggedIn && (
-          <button
-            className={`tab-btn ${source === 'nuvio' ? 'tab-active' : ''}`}
-            onClick={() => setSource('nuvio')}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-          >
-            <Zap size={16} aria-hidden="true" /> Nuvio Saved Collections
-          </button>
-        )}
-        {simklConnected && (
-          <button
-            className={`tab-btn ${source === 'simkl' ? 'tab-active' : ''}`}
-            onClick={() => setSource('simkl')}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-          >
-            <BarChart2 size={16} aria-hidden="true" /> Simkl History
-          </button>
-        )}
-      </div>
+      {/* Source Segmented Control */}
+      {(nuvioLoggedIn || simklConnected) && (
+        <div className="segmented-control">
+          {nuvioLoggedIn && (
+            <button
+              className={`segmented-control-btn ${source === 'nuvio' ? 'active' : ''}`}
+              onClick={() => setSource('nuvio')}
+            >
+              <Zap size={16} aria-hidden="true" /> Nuvio Collections
+            </button>
+          )}
+          {simklConnected && (
+            <button
+              className={`segmented-control-btn ${source === 'simkl' ? 'active' : ''}`}
+              onClick={() => setSource('simkl')}
+            >
+              <BarChart2 size={16} aria-hidden="true" /> Simkl History
+            </button>
+          )}
+        </div>
+      )}
 
       {source === 'simkl' && (
         <>
