@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Zap, Package, BarChart2, Tv, Link as LinkIcon, Blocks, ChevronUp, ChevronDown, Check, X, Trash2, GripVertical } from 'lucide-react'
 import { useAuthStore } from '../store/auth-store'
 import { useAddonStore } from '../store/addon-store'
 
@@ -137,7 +138,7 @@ export default function Settings() {
       {/* Nuvio Account */}
       <section className="settings-section">
         <h2 className="settings-section-title">
-          <span className="settings-icon">⚡</span>
+          <span className="settings-icon"><Zap size={20} aria-hidden="true" /></span>
           Nuvio Account
         </h2>
         <div className="card-glass settings-card">
@@ -168,7 +169,7 @@ export default function Settings() {
       {/* TorBox */}
       <section className="settings-section">
         <h2 className="settings-section-title">
-          <span className="settings-icon">📦</span>
+          <span className="settings-icon"><Package size={20} aria-hidden="true" /></span>
           TorBox
           {torboxConnected && <span className="badge badge-success">Connected</span>}
           <span className="settings-subtitle">Optional — needed for torrent streams</span>
@@ -180,6 +181,7 @@ export default function Settings() {
               className="input"
               placeholder="TorBox API Key"
               value={torboxKeyInput}
+              aria-label="TorBox API Key"
               onChange={(e) => setTorboxKeyInput(e.target.value)}
               style={{ flex: 1 }}
             />
@@ -216,7 +218,7 @@ export default function Settings() {
       {/* Simkl */}
       <section className="settings-section">
         <h2 className="settings-section-title">
-          <span className="settings-icon">📊</span>
+          <span className="settings-icon"><BarChart2 size={20} aria-hidden="true" /></span>
           Simkl Tracking
           {simklConnected && <span className="badge badge-success">Connected</span>}
           {simklLoading && <span className="badge">Connecting...</span>}
@@ -231,6 +233,7 @@ export default function Settings() {
                   className="input"
                   placeholder="Simkl Client ID"
                   value={simklIdInput}
+                  aria-label="Simkl Client ID"
                   onChange={(e) => setSimklIdInput(e.target.value)}
                   style={{ flex: 1 }}
                 />
@@ -241,6 +244,7 @@ export default function Settings() {
                   className="input"
                   placeholder="Simkl Client Secret"
                   value={simklSecretInput}
+                  aria-label="Simkl Client Secret"
                   onChange={(e) => setSimklSecretInput(e.target.value)}
                   style={{ flex: 1 }}
                 />
@@ -262,7 +266,7 @@ export default function Settings() {
               <div className="settings-row">
                 <button
                   className="btn-primary"
-                  style={{ width: '100%', justifyContent: 'center', marginTop: '0.25rem' }}
+                  style={{ width: '100%', justifyContent: 'center', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}
                   disabled={simklLoading}
                   onClick={async () => {
                     const id = simklIdInput.trim()
@@ -287,7 +291,8 @@ export default function Settings() {
                     }
                   }}
                 >
-                  {simklLoading ? 'Connecting to Simkl...' : '🔗 Connect with Simkl'}
+                  <LinkIcon size={16} aria-hidden="true" />
+                  {simklLoading ? 'Connecting to Simkl...' : 'Connect with Simkl'}
                 </button>
               </div>
             </>
@@ -305,7 +310,7 @@ export default function Settings() {
           <div className="settings-help" style={{ marginTop: '0.75rem', lineHeight: '1.6' }}>
             <p>
               1. Open{' '}
-              <a href="https://simkl.com/settings/developer/new/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--neon-violet, #a855f7)', textDecoration: 'underline' }}>
+              <a href="https://simkl.com/settings/developer/new/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent-primary, #a855f7)', textDecoration: 'underline' }}>
                 simkl.com/settings/developer/new
               </a>{' '}
               (or edit your existing app).
@@ -323,7 +328,7 @@ export default function Settings() {
                 style={{ padding: '2px 8px', fontSize: '0.8rem' }}
                 onClick={() => {
                   navigator.clipboard.writeText(`${window.location.origin}/settings`)
-                  setMessage({ text: '📋 Redirect URI copied to clipboard!', type: 'success' })
+                  setMessage({ text: 'Redirect URI copied to clipboard!', type: 'success' })
                 }}
               >
                 Copy URL
@@ -336,7 +341,7 @@ export default function Settings() {
       {/* Trakt */}
       <section className="settings-section">
         <h2 className="settings-section-title">
-          <span className="settings-icon">📺</span>
+          <span className="settings-icon"><Tv size={20} aria-hidden="true" /></span>
           Trakt Tracking
           {traktConnected && <span className="badge badge-success">Connected</span>}
           <span className="settings-subtitle">Optional — for watch history tracking</span>
@@ -348,6 +353,7 @@ export default function Settings() {
               className="input"
               placeholder="Trakt Client ID"
               value={traktIdInput}
+              aria-label="Trakt Client ID"
               onChange={(e) => setTraktIdInput(e.target.value)}
               style={{ flex: 1 }}
             />
@@ -400,7 +406,7 @@ export default function Settings() {
       {/* CORS Proxy */}
       <section className="settings-section">
         <h2 className="settings-section-title">
-          <span className="settings-icon">🔗</span>
+          <span className="settings-icon"><LinkIcon size={20} aria-hidden="true" /></span>
           CORS Proxy
           <span className="settings-subtitle">Required if addons block browser requests</span>
         </h2>
@@ -411,6 +417,7 @@ export default function Settings() {
               className="input"
               placeholder="https://your-cors-proxy.workers.dev/?url="
               value={corsInput}
+              aria-label="CORS Proxy URL"
               onChange={(e) => setCorsInput(e.target.value)}
               style={{ flex: 1 }}
             />
@@ -433,7 +440,7 @@ export default function Settings() {
       {/* Addon Manager */}
       <section className="settings-section">
         <h2 className="settings-section-title">
-          <span className="settings-icon">🧩</span>
+          <span className="settings-icon"><Blocks size={20} aria-hidden="true" /></span>
           Installed Addons
           <span className="badge">{addons.length}</span>
         </h2>
@@ -444,6 +451,7 @@ export default function Settings() {
               className="input"
               placeholder="Addon manifest URL (https://...manifest.json)"
               value={addonUrlInput}
+              aria-label="Addon manifest URL"
               onChange={(e) => setAddonUrlInput(e.target.value)}
               style={{ flex: 1 }}
             />
@@ -472,8 +480,8 @@ export default function Settings() {
               }}
               className={`card-glass addon-item ${!addon.enabled ? 'addon-disabled' : ''} ${draggedIndex === index ? 'dragging' : ''}`}
             >
-              <div className="drag-handle" title="Drag to reorder" style={{ cursor: 'grab', padding: '0 8px', opacity: 0.5, fontSize: '1.2rem' }}>
-                ⋮⋮
+              <div className="drag-handle" title="Drag to reorder" aria-label="Drag handle" style={{ cursor: 'grab', padding: '0 8px', opacity: 0.5, display: 'flex', alignItems: 'center' }}>
+                <GripVertical size={20} aria-hidden="true" />
               </div>
               <div className="addon-info">
                 {addon.manifest.logo && (
@@ -481,6 +489,7 @@ export default function Settings() {
                     src={addon.manifest.logo}
                     alt={addon.manifest.name}
                     className="addon-logo"
+                    loading="lazy"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                   />
                 )}
@@ -502,31 +511,37 @@ export default function Settings() {
                   className="btn-ghost"
                   onClick={() => moveAddonUp(index)}
                   disabled={index === 0}
+                  aria-label="Move addon up"
                   title="Move Up"
                   style={{ opacity: index === 0 ? 0.3 : 1 }}
                 >
-                  ▲
+                  <ChevronUp size={18} aria-hidden="true" />
                 </button>
                 <button
                   className="btn-ghost"
                   onClick={() => moveAddonDown(index)}
                   disabled={index === addons.length - 1}
+                  aria-label="Move addon down"
                   title="Move Down"
                   style={{ opacity: index === addons.length - 1 ? 0.3 : 1 }}
                 >
-                  ▼
+                  <ChevronDown size={18} aria-hidden="true" />
                 </button>
                 <button
                   className="btn-ghost"
                   onClick={() => toggleAddon(addon.manifestUrl)}
+                  aria-label={addon.enabled ? 'Disable addon' : 'Enable addon'}
+                  title={addon.enabled ? 'Disable addon' : 'Enable addon'}
                 >
-                  {addon.enabled ? '✅' : '❌'}
+                  {addon.enabled ? <Check size={18} color="#34d399" aria-hidden="true" /> : <X size={18} color="#ef4444" aria-hidden="true" />}
                 </button>
                 <button
                   className="btn-ghost btn-danger"
                   onClick={() => removeAddon(addon.manifestUrl)}
+                  aria-label={`Remove addon ${addon.manifest.name}`}
+                  title="Remove addon"
                 >
-                  🗑️
+                  <Trash2 size={18} aria-hidden="true" />
                 </button>
               </div>
             </div>

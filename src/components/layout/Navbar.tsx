@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useFocusable } from '@noriginmedia/norigin-spatial-navigation'
+import { Search, X, Zap, Film, Settings, Library, LogOut, Package, BarChart2 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth-store'
 import { AddonClient, MetaPreview } from '../../api/addon-client'
 import { calculateRelevanceScore } from '../../utils/searchUtils'
@@ -180,13 +181,19 @@ export default function Navbar() {
             backdropFilter: 'blur(10px)'
           }}
         >
-          <button type="submit" style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '1.1rem' }} title="Search">
-            🔍
+          <button
+            type="submit"
+            style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            aria-label="Search"
+            title="Search"
+          >
+            <Search size={18} aria-hidden="true" />
           </button>
           <input
             type="text"
             placeholder="Search movies, shows, anime..."
             value={searchQuery}
+            aria-label="Search movies, shows, anime"
             onFocus={() => {
               if (liveSuggestions.length > 0 && location.pathname !== '/search') {
                 setShowSearchSuggestions(true)
@@ -206,14 +213,15 @@ export default function Navbar() {
           {searchQuery && (
             <button
               type="button"
+              aria-label="Clear search"
               onClick={() => {
                 setSearchQuery('')
                 setShowSearchSuggestions(false)
                 if (location.pathname === '/search') navigate('/search')
               }}
-              style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '1.2rem' }}
+              style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             >
-              ✕
+              <X size={16} aria-hidden="true" />
             </button>
           )}
         </form>
@@ -237,8 +245,8 @@ export default function Navbar() {
               animation: 'fadeIn 0.2s ease',
             }}
           >
-            <div style={{ padding: '8px 16px', fontSize: '0.75rem', color: 'var(--color-accent-primary, #a855f7)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              ⚡ INSTANT MATCHES
+            <div style={{ padding: '8px 16px', fontSize: '0.75rem', color: 'var(--color-accent-primary, #a855f7)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Zap size={14} aria-hidden="true" /> INSTANT MATCHES
             </div>
             {liveSuggestions.map((item) => (
               <div
@@ -260,11 +268,12 @@ export default function Navbar() {
                   <img
                     src={item.poster}
                     alt={item.name}
+                    loading="lazy"
                     style={{ width: '32px', height: '46px', objectFit: 'cover', borderRadius: '4px' }}
                   />
                 ) : (
-                  <div style={{ width: '32px', height: '46px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>
-                    🎬
+                  <div style={{ width: '32px', height: '46px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                    <Film size={16} aria-hidden="true" />
                   </div>
                 )}
                 <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -309,11 +318,14 @@ export default function Navbar() {
               fontWeight: 600,
               background: torboxConnected ? 'rgba(46, 213, 115, 0.15)' : 'rgba(255, 71, 87, 0.15)',
               color: torboxConnected ? '#2ed573' : '#ff4757',
-              border: `1px solid ${torboxConnected ? 'rgba(46, 213, 115, 0.3)' : 'rgba(255, 71, 87, 0.3)'}`
+              border: `1px solid ${torboxConnected ? 'rgba(46, 213, 115, 0.3)' : 'rgba(255, 71, 87, 0.3)'}`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
             }}
             title={torboxConnected ? 'TorBox Connected' : 'TorBox Not Connected'}
           >
-            📦 TorBox
+            <Package size={14} aria-hidden="true" /> TorBox
           </span>
           <span 
             style={{
@@ -323,17 +335,21 @@ export default function Navbar() {
               fontWeight: 600,
               background: simklConnected ? 'rgba(46, 213, 115, 0.15)' : 'rgba(255, 71, 87, 0.15)',
               color: simklConnected ? '#2ed573' : '#ff4757',
-              border: `1px solid ${simklConnected ? 'rgba(46, 213, 115, 0.3)' : 'rgba(255, 71, 87, 0.3)'}`
+              border: `1px solid ${simklConnected ? 'rgba(46, 213, 115, 0.3)' : 'rgba(255, 71, 87, 0.3)'}`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
             }}
             title={simklConnected ? 'Simkl Connected' : 'Simkl Not Connected'}
           >
-            📊 Simkl
+            <BarChart2 size={14} aria-hidden="true" /> Simkl
           </span>
         </div>
 
         <div style={{ position: 'relative' }} ref={dropdownRef}>
           <button 
             onClick={() => setShowDropdown(!showDropdown)}
+            aria-label="User menu"
             style={{
               background: 'linear-gradient(135deg, #6c5ce7, #a29bfe)',
               border: '2px solid rgba(255,255,255,0.2)',
@@ -370,36 +386,15 @@ export default function Navbar() {
               zIndex: 1001,
               animation: 'fadeIn 0.2s ease'
             }}>
-              <style>
-                {`
-                  @keyframes fadeIn {
-                    from { opacity: 0; transform: translateY(-10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                  }
-                  .dropdown-item {
-                    padding: 12px 20px;
-                    color: #e0e0e0;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                    display: flex;
-                    alignItems: center;
-                    gap: 10px;
-                  }
-                  .dropdown-item:hover {
-                    background: rgba(255, 255, 255, 0.1);
-                    color: #fff;
-                  }
-                `}
-              </style>
               <div className="dropdown-item" onClick={() => { navigate('/settings'); setShowDropdown(false); }}>
-                ⚙️ Settings
+                <Settings size={18} aria-hidden="true" /> Settings
               </div>
               <div className="dropdown-item" onClick={() => { navigate('/library'); setShowDropdown(false); }}>
-                📚 Library
+                <Library size={18} aria-hidden="true" /> Library
               </div>
               <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', margin: '4px 0' }}></div>
               <div className="dropdown-item" style={{ color: '#ff4757' }} onClick={() => setShowDropdown(false)}>
-                🚪 Logout
+                <LogOut size={18} aria-hidden="true" /> Logout
               </div>
             </div>
           )}

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Film } from 'lucide-react'
 import { MetaPreview } from '../../api/addon-client'
 import { useFocusable } from '@noriginmedia/norigin-spatial-navigation'
 
@@ -46,44 +47,13 @@ export default function MediaCard({ item }: Props) {
       ref={ref}
       role="button"
       tabIndex={0}
+      aria-label={item.name}
       className={`media-card ${focused ? 'focused' : ''}`}
       onClick={handleClick}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
           handleClick()
-        }
-      }}
-      style={{
-        position: 'relative',
-        borderRadius: '12px',
-        overflow: 'hidden',
-        boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
-        transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
-        cursor: 'pointer',
-        aspectRatio: '2/3',
-        background: 'linear-gradient(145deg, var(--color-surface-1), var(--color-bg-elevated))',
-        border: 'none',
-        width: '100%',
-        height: '100%',
-        userSelect: 'none',
-      }}
-      onMouseOver={e => {
-        e.currentTarget.style.transform = 'scale(1.05) translateY(-8px)';
-        e.currentTarget.style.boxShadow = '0 20px 40px rgba(168, 85, 247, 0.25)';
-        const overlay = e.currentTarget.querySelector('.media-card-overlay') as HTMLElement;
-        if (overlay) {
-          overlay.style.opacity = '1';
-          overlay.style.transform = 'translateY(0)';
-        }
-      }}
-      onMouseOut={e => {
-        e.currentTarget.style.transform = 'scale(1) translateY(0)';
-        e.currentTarget.style.boxShadow = '0 8px 30px rgba(0,0,0,0.3)';
-        const overlay = e.currentTarget.querySelector('.media-card-overlay') as HTMLElement;
-        if (overlay) {
-          overlay.style.opacity = '0';
-          overlay.style.transform = 'translateY(10px)';
         }
       }}
     >
@@ -94,14 +64,14 @@ export default function MediaCard({ item }: Props) {
             position: 'absolute',
             top: '10px',
             right: '10px',
-            background: 'linear-gradient(135deg, #a855f7, #f472b6)',
+            background: 'linear-gradient(135deg, var(--accent-violet), var(--accent-magenta))',
             color: '#fff',
             fontSize: '0.72rem',
             fontWeight: 800,
             padding: '3px 8px',
-            borderRadius: '8px',
+            borderRadius: 'var(--radius-sm)',
             zIndex: 5,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+            boxShadow: 'var(--shadow-sm)',
             letterSpacing: '0.02em',
           }}
         >
@@ -116,12 +86,12 @@ export default function MediaCard({ item }: Props) {
           alt={item.name}
           loading="lazy"
           onError={() => setImgError(true)}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease', pointerEvents: 'none' }}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease', pointerEvents: 'none', background: 'var(--bg-elevated)' }}
         />
       ) : (
-        <div className="media-poster-fallback" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#aaa', pointerEvents: 'none' }}>
-          <span style={{ fontSize: '2.5rem', marginBottom: '0.8rem', opacity: 0.5 }}>🎬</span>
-          <span style={{ fontWeight: 600, fontSize: '0.9rem', lineHeight: '1.4', padding: '0 12px', textAlign: 'center' }}>
+        <div className="media-poster-fallback" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', pointerEvents: 'none', background: 'var(--bg-elevated)' }}>
+          <Film size={36} aria-hidden="true" style={{ marginBottom: '0.8rem', opacity: 0.5 }} />
+          <span style={{ fontWeight: 600, fontSize: '0.9rem', lineHeight: '1.4', padding: '0 12px', textAlign: 'center', color: 'var(--text-secondary)' }}>
             {item.name}
           </span>
         </div>

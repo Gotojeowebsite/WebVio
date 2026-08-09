@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
+import { ChevronLeft, ChevronRight, Inbox } from 'lucide-react'
 import { MetaPreview } from '../../api/addon-client'
 import MediaCard from './MediaCard'
 
@@ -58,8 +59,6 @@ export default function CatalogRow({ title, items, loading }: Props) {
       if (observer) observer.disconnect()
     }
   }, [items, loading, checkScrollBounds])
-
-
 
   // Global mousemove and mouseup listeners for uninterrupted drag-to-scroll
   useEffect(() => {
@@ -124,7 +123,22 @@ export default function CatalogRow({ title, items, loading }: Props) {
     }
   }
 
-  if (!loading && items.length === 0) return null
+  if (!loading && items.length === 0) {
+    return (
+      <div className="catalog-row">
+        <div className="catalog-header">
+          <h3 className="catalog-title">
+            <span className="catalog-title-accent"></span>
+            {title}
+          </h3>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '16px 24px', color: 'var(--text-muted)' }}>
+          <Inbox size={20} aria-hidden="true" />
+          <span>No results from this catalog</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="catalog-row">
@@ -139,18 +153,20 @@ export default function CatalogRow({ title, items, loading }: Props) {
             className="btn-ghost btn-icon catalog-arrow"
             onClick={() => scroll('left')}
             style={{ opacity: canScrollLeft ? 1 : 0.4 }}
+            aria-label="Scroll left"
             title="Scroll left"
           >
-            ◀
+            <ChevronLeft size={20} aria-hidden="true" />
           </button>
           <button
             type="button"
             className="btn-ghost btn-icon catalog-arrow"
             onClick={() => scroll('right')}
             style={{ opacity: canScrollRight ? 1 : 0.4 }}
+            aria-label="Scroll right"
             title="Scroll right"
           >
-            ▶
+            <ChevronRight size={20} aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -161,15 +177,17 @@ export default function CatalogRow({ title, items, loading }: Props) {
           type="button"
           className={`catalog-floating-arrow catalog-floating-left ${canScrollLeft ? 'visible' : ''}`}
           onClick={() => scroll('left')}
+          aria-label="Scroll left"
           title="Scroll left"
         >
-          ‹
+          <ChevronLeft size={28} aria-hidden="true" />
         </button>
 
         <div
           className={`catalog-scroll-container ${isDragging ? 'dragging' : ''}`}
           ref={scrollRef}
           tabIndex={0}
+          aria-label={`${title} carousel`}
           onKeyDown={handleKeyDown}
           onMouseDown={handleMouseDown}
         >
@@ -194,9 +212,10 @@ export default function CatalogRow({ title, items, loading }: Props) {
           type="button"
           className={`catalog-floating-arrow catalog-floating-right ${canScrollRight ? 'visible' : ''}`}
           onClick={() => scroll('right')}
+          aria-label="Scroll right"
           title="Scroll right"
         >
-          ›
+          <ChevronRight size={28} aria-hidden="true" />
         </button>
       </div>
     </div>

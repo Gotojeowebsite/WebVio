@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { Search as SearchIcon, X, Film, Tv, Sparkles, Zap, Inbox } from 'lucide-react'
 import { useAddonStore } from '../store/addon-store'
 import { AddonClient, MetaPreview } from '../api/addon-client'
 import MediaCard from '../components/catalog/MediaCard'
-
 import { calculateRelevanceScore } from '../utils/searchUtils';
 const CINEMETA_URL = 'https://v3-cinemeta.strem.io/manifest.json'
 const ANIME_KITSU_URL = 'https://anime-kitsu.strem.fun/manifest.json'
@@ -255,14 +255,15 @@ export default function Search() {
     <div className="page search-page">
       <form className="search-form" onSubmit={handleSubmit}>
         <div className="search-input-wrapper">
-          <button type="submit" className="search-icon-btn" title="Search">
-            🔍
+          <button type="submit" className="search-icon-btn" aria-label="Submit search" title="Search">
+            <SearchIcon size={20} aria-hidden="true" />
           </button>
           <input
             type="text"
             className="input search-input-large"
             placeholder="Search movies, series, anime (e.g. Demon Slayer, Attack on Titan, One Piece)..."
             value={inputValue}
+            aria-label="Search movies, series, anime"
             onChange={(e) => setInputValue(e.target.value)}
             autoFocus
           />
@@ -270,13 +271,14 @@ export default function Search() {
             <button
               type="button"
               className="btn-ghost search-clear"
+              aria-label="Clear search"
               onClick={() => {
                 setInputValue('')
                 setResults([])
                 setSearchParams({})
               }}
             >
-              ✕
+              <X size={18} aria-hidden="true" />
             </button>
           )}
         </div>
@@ -289,37 +291,44 @@ export default function Search() {
           style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}
         >
           {[
-            { key: 'all', label: `All Matches (${results.length})` },
-            { key: 'movie', label: `🎬 Movies (${movieCount})` },
-            { key: 'series', label: `📺 Series (${seriesCount})` },
-            { key: 'anime', label: `🎌 Anime (${animeCount})` },
-          ].map((cat) => (
-            <button
-              key={cat.key}
-              type="button"
-              className={`btn-ghost ${activeCategory === cat.key ? 'active' : ''}`}
-              style={{
-                borderRadius: '9999px',
-                padding: '0.4rem 1.1rem',
-                fontSize: '0.85rem',
-                fontWeight: activeCategory === cat.key ? '600' : '400',
-                border:
-                  activeCategory === cat.key
-                    ? '1px solid var(--color-accent-primary, #a855f7)'
-                    : '1px solid rgba(255,255,255,0.1)',
-                background:
-                  activeCategory === cat.key
-                    ? 'rgba(168, 85, 247, 0.2)'
-                    : 'rgba(255,255,255,0.04)',
-                color: activeCategory === cat.key ? '#fff' : 'var(--color-text-muted, #94a3b8)',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-              }}
-              onClick={() => setActiveCategory(cat.key as CategoryFilter)}
-            >
-              {cat.label}
-            </button>
-          ))}
+            { key: 'all', label: 'All Matches', count: results.length, icon: null },
+            { key: 'movie', label: 'Movies', count: movieCount, icon: Film },
+            { key: 'series', label: 'Series', count: seriesCount, icon: Tv },
+            { key: 'anime', label: 'Anime', count: animeCount, icon: Sparkles },
+          ].map((cat) => {
+            const Icon = cat.icon
+            return (
+              <button
+                key={cat.key}
+                type="button"
+                className={`btn-ghost ${activeCategory === cat.key ? 'active' : ''}`}
+                style={{
+                  borderRadius: '9999px',
+                  padding: '0.4rem 1.1rem',
+                  fontSize: '0.85rem',
+                  fontWeight: activeCategory === cat.key ? '600' : '400',
+                  border:
+                    activeCategory === cat.key
+                      ? '1px solid var(--color-accent-primary, #a855f7)'
+                      : '1px solid rgba(255,255,255,0.1)',
+                  background:
+                    activeCategory === cat.key
+                      ? 'rgba(168, 85, 247, 0.2)'
+                      : 'rgba(255,255,255,0.04)',
+                  color: activeCategory === cat.key ? '#fff' : 'var(--color-text-muted, #94a3b8)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                onClick={() => setActiveCategory(cat.key as CategoryFilter)}
+              >
+                {Icon && <Icon size={14} aria-hidden="true" />}
+                {cat.label} ({cat.count})
+              </button>
+            )
+          })}
         </div>
       )}
 
@@ -332,7 +341,7 @@ export default function Search() {
 
       {!loading && query && filteredResults.length === 0 && (
         <div className="search-empty">
-          <p className="search-empty-icon">🔍</p>
+          <Inbox size={48} aria-hidden="true" style={{ marginBottom: '16px', opacity: 0.5 }} />
           <h3>No relevant titles found for "{query}"</h3>
           <p style={{ marginTop: '0.5rem', color: 'var(--color-text-muted, #94a3b8)' }}>
             Try checking spelling or explore popular suggested searches below.
@@ -347,8 +356,8 @@ export default function Search() {
               Found {filteredResults.length} relevant match{filteredResults.length !== 1 ? 'es' : ''} for "{query}"
             </p>
             {loading && (
-              <span style={{ fontSize: '0.8rem', color: 'var(--color-accent-primary, #a855f7)' }}>
-                ⚡ Scanning more catalogs...
+              <span style={{ fontSize: '0.8rem', color: 'var(--color-accent-primary, #a855f7)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <Zap size={14} aria-hidden="true" /> Scanning more catalogs...
               </span>
             )}
           </div>
@@ -362,7 +371,7 @@ export default function Search() {
 
       {(!query || (filteredResults.length === 0 && !loading)) && (
         <div className="search-empty" style={{ textAlign: 'center', marginTop: query ? '2rem' : '0' }}>
-          {!query && <p className="search-empty-icon">🎬</p>}
+          {!query && <Film size={48} aria-hidden="true" style={{ marginBottom: '16px', opacity: 0.5 }} />}
           <h3>{!query ? 'Smart Instant Search' : 'Popular Suggestions'}</h3>
           <p
             style={{

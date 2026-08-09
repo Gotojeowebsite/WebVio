@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Zap, Package, Check, Play } from 'lucide-react'
 import { useAuthStore } from '../store/auth-store'
 import { useAddonStore } from '../store/addon-store'
 import './login.css'
@@ -68,7 +69,9 @@ export default function Login() {
       <div className="login-container">
         <div className="login-card card-glass">
           <div className="login-header">
-            <h1 className="login-brand">⚡ Webvio</h1>
+            <h1 className="login-brand" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <Zap size={28} aria-hidden="true" /> Webvio
+            </h1>
             <p className="login-tagline">Stream anything. Track everything.</p>
           </div>
 
@@ -114,10 +117,16 @@ export default function Login() {
                 These are optional. You can set them up later in Settings.
               </p>
 
-              {addonStatus && <p className="login-status" style={{ marginBottom: '1rem' }}>✅ {addonStatus}</p>}
+              {addonStatus && (
+                <p className="login-status" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Check size={16} aria-hidden="true" /> {addonStatus}
+                </p>
+              )}
 
               <div className="login-optional-section">
-                <h4>📦 TorBox <span className="badge">Optional</span></h4>
+                <h4 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Package size={18} aria-hidden="true" /> TorBox <span className="badge">Optional</span>
+                </h4>
                 <p className="text-xs text-muted">Needed for torrent-based streams. Direct HTTP streams work without it.</p>
                 <input className="input" type="password" value={torboxKey} onChange={e => setTorboxKey(e.target.value)} placeholder="TorBox API Key" style={{ marginTop: '0.5rem' }} />
               </div>
@@ -125,9 +134,9 @@ export default function Login() {
               <button
                 className="btn btn-primary btn-lg w-full"
                 onClick={handleContinue}
-                style={{ marginTop: '1.5rem' }}
+                style={{ marginTop: '1.5rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
               >
-                🚀 Start Streaming
+                <Play size={18} fill="currentColor" aria-hidden="true" /> Start Streaming
               </button>
 
               <button

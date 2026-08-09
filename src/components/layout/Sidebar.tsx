@@ -1,25 +1,31 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useFocusable } from '@noriginmedia/norigin-spatial-navigation'
+import { Home, Search, Library, Settings } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { path: '/', icon: '🏠', label: 'Home' },
-  { path: '/search', icon: '🔍', label: 'Search' },
-  { path: '/library', icon: '📚', label: 'Library' },
-  { path: '/settings', icon: '⚙️', label: 'Settings' },
+  { path: '/', icon: Home, label: 'Home' },
+  { path: '/search', icon: Search, label: 'Search' },
+  { path: '/library', icon: Library, label: 'Library' },
+  { path: '/settings', icon: Settings, label: 'Settings' },
 ]
 
-function SidebarItemComponent({ item, active, onClick }: { item: any, active: boolean, onClick: () => void }) {
+function SidebarItemComponent({ item, active, onClick }: { item: typeof NAV_ITEMS[0], active: boolean, onClick: () => void }) {
   const { ref, focused } = useFocusable({
     onEnterPress: onClick
   })
+
+  const Icon = item.icon
 
   return (
     <button
       ref={ref}
       className={`sidebar-item ${active ? 'active' : ''} ${focused ? 'focused' : ''}`}
       onClick={onClick}
+      aria-label={item.label}
     >
-      <span className="sidebar-icon">{item.icon}</span>
+      <span className="sidebar-icon">
+        <Icon size={20} aria-hidden="true" />
+      </span>
       <span className="sidebar-label">{item.label}</span>
     </button>
   )

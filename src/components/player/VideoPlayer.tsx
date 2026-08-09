@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback, MouseEvent as ReactMouseEvent } from 'react'
 import Hls from 'hls.js'
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Subtitles, Music, RotateCcw, RotateCw, ArrowLeft, X, Zap, Globe, AlertCircle } from 'lucide-react'
 import { usePlayerStore, EnrichedStream } from '../../store/player-store'
 import { parseStreamInfo, resolveStreamUrl } from '../../utils/stream-resolver'
 import { useAuthStore } from '../../store/auth-store'
@@ -473,16 +474,6 @@ export default function VideoPlayer({
     }
   }
 
-  // Icons
-  const PlayIcon = () => <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-  const PauseIcon = () => <svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-  const VolumeIcon = () => <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-  const MuteIcon = () => <svg viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
-  const FullscreenIcon = () => <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
-  const ExitFullscreenIcon = () => <svg viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>
-  const SubtitlesIcon = () => <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-9 7H9.5v-.5h-2v3h2V13H11v1c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1c0 .55-.45 1-1 1h-3c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1z"/></svg>
-  const AudioIcon = () => <svg viewBox="0 0 24 24"><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z"/></svg>
-
   return (
     <div 
       className="video-container" 
@@ -498,14 +489,18 @@ export default function VideoPlayer({
           type="button"
           className="unmute-toast"
           onClick={handleUserUnmuteClick}
+          aria-label="Click to unmute audio"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
         >
-          🔊 Click to Unmute Audio
+          <Volume2 size={20} aria-hidden="true" /> Click to Unmute Audio
         </button>
       )}
 
       {error && (
         <div className="video-error">
-          <p style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: 600 }}>⚠️ {error}</p>
+          <p style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            <AlertCircle size={20} color="#f59e0b" aria-hidden="true" /> {error}
+          </p>
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
             <button className="btn btn-primary" onClick={() => {
               setError('')
@@ -524,8 +519,10 @@ export default function VideoPlayer({
                   const alt = availableStreams.find(s => s.url !== activeSrc && s.infoHash) || availableStreams[1]
                   if (alt) handleSwitchToStream(alt)
                 }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               >
-                {switchingStream ? 'Transcoding...' : '⚡ Switch to Alternate Stream'}
+                <Zap size={16} aria-hidden="true" />
+                {switchingStream ? 'Transcoding...' : 'Switch to Alternate Stream'}
               </button>
             )}
           </div>
@@ -568,10 +565,8 @@ export default function VideoPlayer({
 
         <div className="video-top-bar">
           {onBack && (
-            <button className="player-back-btn" onClick={onBack} title="Back">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-                <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
-              </svg>
+            <button className="player-back-btn" onClick={onBack} aria-label="Go back" title="Back">
+              <ArrowLeft size={24} aria-hidden="true" />
             </button>
           )}
           <div className="player-title-info">
@@ -588,8 +583,12 @@ export default function VideoPlayer({
         {showSubMenu && (
           <div className="player-popover sub-popover" onClick={e => e.stopPropagation()}>
             <div className="popover-header">
-              <h4>💬 Subtitles</h4>
-              <button className="popover-close" onClick={() => setShowSubMenu(false)}>✕</button>
+              <h4 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Subtitles size={18} aria-hidden="true" /> Subtitles
+              </h4>
+              <button className="popover-close" onClick={() => setShowSubMenu(false)} aria-label="Close subtitle menu">
+                <X size={18} aria-hidden="true" />
+              </button>
             </div>
 
             <div className="popover-section">
@@ -599,15 +598,16 @@ export default function VideoPlayer({
                   className={`popover-item ${selectedSubId === 'off' ? 'active' : ''}`}
                   onClick={() => setSelectedSubId('off')}
                 >
-                  🚫 Off
+                  Off
                 </button>
                 {subtitles.map(sub => (
                   <button
                     key={sub.id || sub.lang}
                     className={`popover-item ${selectedSubId === (sub.id || sub.lang) ? 'active' : ''}`}
                     onClick={() => setSelectedSubId(sub.id || sub.lang)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
-                    🌐 {sub.lang.toUpperCase()}
+                    <Globe size={14} aria-hidden="true" /> {sub.lang.toUpperCase()}
                   </button>
                 ))}
               </div>
@@ -637,8 +637,12 @@ export default function VideoPlayer({
         {showAudioMenu && (
           <div className="player-popover audio-popover" onClick={e => e.stopPropagation()}>
             <div className="popover-header">
-              <h4>🎧 Audio Tracks</h4>
-              <button className="popover-close" onClick={() => setShowAudioMenu(false)}>✕</button>
+              <h4 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Music size={18} aria-hidden="true" /> Audio Tracks
+              </h4>
+              <button className="popover-close" onClick={() => setShowAudioMenu(false)} aria-label="Close audio menu">
+                <X size={18} aria-hidden="true" />
+              </button>
             </div>
 
             {audioTracks.length > 1 ? (
@@ -650,8 +654,9 @@ export default function VideoPlayer({
                       key={t.id}
                       className={`popover-item ${selectedAudioTrack === t.id ? 'active' : ''}`}
                       onClick={() => handleAudioTrackSelect(t.id)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
-                      🎵 {t.name} ({t.lang})
+                      <Music size={14} aria-hidden="true" /> {t.name} ({t.lang})
                     </button>
                   ))}
                 </div>
@@ -667,7 +672,7 @@ export default function VideoPlayer({
         )}
 
         <div className="video-bottom-controls">
-          <div className="video-progress-container" onClick={handleSeek}>
+          <div className="video-progress-container" onClick={handleSeek} role="slider" aria-label="Video timeline" aria-valuenow={currentTime} aria-valuemin={0} aria-valuemax={duration || 0}>
             <div className="video-progress-bar" style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}>
               <div className="video-progress-thumb" />
             </div>
@@ -675,23 +680,45 @@ export default function VideoPlayer({
 
           <div className="video-actions">
             <div className="video-left-actions">
-              <button className="control-btn play-pause-btn" onClick={togglePlay} title="Play/Pause (Space)">
-                {isPlaying ? <PauseIcon /> : <PlayIcon />}
+              <button
+                className="control-btn play-pause-btn"
+                onClick={togglePlay}
+                aria-label={isPlaying ? 'Pause' : 'Play'}
+                title="Play/Pause (Space)"
+              >
+                {isPlaying ? <Pause size={24} aria-hidden="true" /> : <Play size={24} fill="currentColor" aria-hidden="true" />}
               </button>
 
-              <button className="control-btn skip-btn" onClick={() => skipSeconds(-10)} title="Rewind 10s (←)">
-                ⏪ 10s
+              <button
+                className="control-btn skip-btn"
+                onClick={() => skipSeconds(-10)}
+                aria-label="Rewind 10 seconds"
+                title="Rewind 10s (←)"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              >
+                <RotateCcw size={16} aria-hidden="true" /> 10s
               </button>
 
-              <button className="control-btn skip-btn" onClick={() => skipSeconds(10)} title="Forward 10s (→)">
-                ⏩ 10s
+              <button
+                className="control-btn skip-btn"
+                onClick={() => skipSeconds(10)}
+                aria-label="Forward 10 seconds"
+                title="Forward 10s (→)"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              >
+                <RotateCw size={16} aria-hidden="true" /> 10s
               </button>
               
               <div className="volume-container">
-                <button className="control-btn" onClick={toggleMute} title="Mute/Unmute (M)">
-                  {isMuted || volume === 0 ? <MuteIcon /> : <VolumeIcon />}
+                <button
+                  className="control-btn"
+                  onClick={toggleMute}
+                  aria-label={isMuted || volume === 0 ? 'Unmute' : 'Mute'}
+                  title="Mute/Unmute (M)"
+                >
+                  {isMuted || volume === 0 ? <VolumeX size={20} aria-hidden="true" /> : <Volume2 size={20} aria-hidden="true" />}
                 </button>
-                <div className="volume-slider" onClick={handleVolume}>
+                <div className="volume-slider" onClick={handleVolume} role="slider" aria-label="Volume slider" aria-valuenow={isMuted ? 0 : volume * 100} aria-valuemin={0} aria-valuemax={100}>
                   <div className="volume-level" style={{ width: `${isMuted ? 0 : volume * 100}%` }} />
                 </div>
               </div>
@@ -710,9 +737,10 @@ export default function VideoPlayer({
                   setShowSubMenu(!showSubMenu)
                   setShowAudioMenu(false)
                 }}
+                aria-label="Subtitles menu"
                 title="Subtitles (C)"
               >
-                <SubtitlesIcon />
+                <Subtitles size={20} aria-hidden="true" />
                 <span className="btn-label">Subtitles</span>
               </button>
 
@@ -725,16 +753,22 @@ export default function VideoPlayer({
                     setShowAudioMenu(!showAudioMenu)
                     setShowSubMenu(false)
                   }}
+                  aria-label="Audio tracks menu"
                   title="Audio Tracks"
                 >
-                  <AudioIcon />
+                  <Music size={20} aria-hidden="true" />
                   <span className="btn-label">Audio</span>
                 </button>
               )}
 
               {/* Fullscreen Button */}
-              <button className="control-btn" onClick={toggleFullscreen} title="Fullscreen (F)">
-                {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
+              <button
+                className="control-btn"
+                onClick={toggleFullscreen}
+                aria-label={isFullscreen ? 'Exit full screen' : 'Full screen'}
+                title="Fullscreen (F)"
+              >
+                {isFullscreen ? <Minimize size={20} aria-hidden="true" /> : <Maximize size={20} aria-hidden="true" />}
               </button>
             </div>
           </div>

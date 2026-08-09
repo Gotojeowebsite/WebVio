@@ -1,19 +1,20 @@
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '../store/auth-store'
 import { useNavigate } from 'react-router-dom'
+import { Library as LibraryIcon, Play, ListPlus, CheckCircle2, PauseCircle, XCircle, Zap, BarChart2, Inbox } from 'lucide-react'
 import MediaCard from '../components/catalog/MediaCard'
 import { MetaPreview } from '../api/addon-client'
 import { pullCollectionsFromNuvio } from '../api/nuvio-auth'
 
 type SimklStatus = 'watching' | 'plantowatch' | 'completed' | 'hold' | 'dropped'
 
-const STATUS_TABS: { key: SimklStatus | 'all'; label: string; icon: string }[] = [
-  { key: 'all', label: 'All', icon: '📚' },
-  { key: 'watching', label: 'Watching', icon: '▶️' },
-  { key: 'plantowatch', label: 'Plan to Watch', icon: '📋' },
-  { key: 'completed', label: 'Completed', icon: '✅' },
-  { key: 'hold', label: 'On Hold', icon: '⏸️' },
-  { key: 'dropped', label: 'Dropped', icon: '❌' },
+const STATUS_TABS: { key: SimklStatus | 'all'; label: string; icon: any }[] = [
+  { key: 'all', label: 'All', icon: LibraryIcon },
+  { key: 'watching', label: 'Watching', icon: Play },
+  { key: 'plantowatch', label: 'Plan to Watch', icon: ListPlus },
+  { key: 'completed', label: 'Completed', icon: CheckCircle2 },
+  { key: 'hold', label: 'On Hold', icon: PauseCircle },
+  { key: 'dropped', label: 'Dropped', icon: XCircle },
 ]
 
 const TYPE_TABS = [
@@ -109,7 +110,7 @@ export default function Library() {
     return (
       <div className="page library-page">
         <div className="empty-state">
-          <p className="empty-state-icon">📊</p>
+          <BarChart2 size={48} aria-hidden="true" style={{ marginBottom: '16px', opacity: 0.5 }} />
           <h2>Connect Nuvio or Simkl to view your library</h2>
           <p>Sync your collection cards and track progress across all devices</p>
           <button className="btn-primary" onClick={() => navigate('/settings')}>
@@ -130,16 +131,18 @@ export default function Library() {
           <button
             className={`tab-btn ${source === 'nuvio' ? 'tab-active' : ''}`}
             onClick={() => setSource('nuvio')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >
-            ⚡ Nuvio Saved Collections
+            <Zap size={16} aria-hidden="true" /> Nuvio Saved Collections
           </button>
         )}
         {simklConnected && (
           <button
             className={`tab-btn ${source === 'simkl' ? 'tab-active' : ''}`}
             onClick={() => setSource('simkl')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >
-            📊 Simkl History
+            <BarChart2 size={16} aria-hidden="true" /> Simkl History
           </button>
         )}
       </div>
@@ -159,15 +162,19 @@ export default function Library() {
           </div>
 
           <div className="library-status-tabs">
-            {STATUS_TABS.map(tab => (
-              <button
-                key={tab.key}
-                className={`tab-btn tab-btn-small ${activeStatus === tab.key ? 'tab-active' : ''}`}
-                onClick={() => setActiveStatus(tab.key)}
-              >
-                <span>{tab.icon}</span> {tab.label}
-              </button>
-            ))}
+            {STATUS_TABS.map(tab => {
+              const Icon = tab.icon
+              return (
+                <button
+                  key={tab.key}
+                  className={`tab-btn tab-btn-small ${activeStatus === tab.key ? 'tab-active' : ''}`}
+                  onClick={() => setActiveStatus(tab.key)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Icon size={14} aria-hidden="true" /> {tab.label}
+                </button>
+              )
+            })}
           </div>
         </>
       )}
@@ -182,7 +189,7 @@ export default function Library() {
 
       {!loading && items.length === 0 && (
         <div className="empty-state">
-          <p className="empty-state-icon">📭</p>
+          <Inbox size={48} aria-hidden="true" style={{ marginBottom: '16px', opacity: 0.5 }} />
           <h3>Nothing here yet</h3>
           <p>Start saving cards or watching titles to build your library</p>
         </div>

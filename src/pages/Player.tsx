@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Play } from 'lucide-react'
 import { usePlayerStore } from '../store/player-store'
 import { useAuthStore } from '../store/auth-store'
 import { markWatched } from '../api/simkl'
@@ -182,13 +183,13 @@ export default function Player() {
     const s = Math.floor(savedTime % 60)
     const timeStr = `${m}:${s < 10 ? '0' : ''}${s}`
     return (
-      <div className="player-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0f', color: '#fff' }}>
-        <div style={{ textAlign: 'center', background: '#1a1a2e', padding: '3rem', borderRadius: '16px', border: '1px solid #333' }}>
-          <h2 style={{ marginBottom: '1rem', fontSize: '2rem' }}>Resume Playback?</h2>
-          <p style={{ color: '#aaa', marginBottom: '2rem' }}>You left off at {timeStr}</p>
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-            <button className="btn btn-primary btn-lg" onClick={() => handleResumeChoice(true)}>
-              ▶ Resume from {timeStr}
+      <div className="player-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+        <div style={{ textAlign: 'center', background: 'var(--bg-elevated)', padding: 'var(--space-6)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-lg)' }}>
+          <h2 style={{ marginBottom: 'var(--space-3)', fontSize: 'var(--text-2xl)' }}>Resume Playback?</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-5)' }}>You left off at {timeStr}</p>
+          <div style={{ display: 'flex', gap: 'var(--space-4)', justifyContent: 'center' }}>
+            <button className="btn btn-primary btn-lg" onClick={() => handleResumeChoice(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              <Play size={18} fill="currentColor" aria-hidden="true" /> Resume from {timeStr}
             </button>
             <button className="btn btn-secondary btn-lg" onClick={() => handleResumeChoice(false)}>
               Start from Beginning

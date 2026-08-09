@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { Play, ArrowLeft, Star, Zap, Inbox } from 'lucide-react'
 import { useAddonStore } from '../store/addon-store'
 import { AddonClient, Meta } from '../api/addon-client'
 import StreamPicker from '../components/detail/StreamPicker'
@@ -123,7 +124,7 @@ export default function Detail() {
     return (
       <div className="detail-page">
         <div className="empty-state">
-          <p className="empty-state-icon">😔</p>
+          <Inbox size={48} aria-hidden="true" style={{ marginBottom: '16px', opacity: 0.5 }} />
           <h3>Content not found</h3>
           <button className="btn btn-primary" onClick={() => navigate(-1)}>Go Back</button>
         </div>
@@ -152,7 +153,11 @@ export default function Detail() {
           <div className="detail-info">
             {meta.year && <span>{meta.year}</span>}
             {meta.runtime && <span>{meta.runtime}</span>}
-            {meta.imdbRating && <span>⭐ {meta.imdbRating}</span>}
+            {meta.imdbRating && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <Star size={14} fill="#f5c518" color="#f5c518" aria-hidden="true" /> {meta.imdbRating}
+              </span>
+            )}
             {meta.genres?.slice(0, 4).map(g => (
               <span key={g} className="badge">{g}</span>
             ))}
@@ -164,10 +169,10 @@ export default function Detail() {
 
           <div className="detail-actions">
             <button className="btn btn-primary btn-lg" onClick={() => handlePlay()}>
-              ▶ {isShow ? (episodesInSeason.length > 0 ? `Play S${selectedSeason}E1` : 'Play Episodes') : 'Play Movie'}
+              <Play size={18} fill="currentColor" aria-hidden="true" /> {isShow ? (episodesInSeason.length > 0 ? `Play S${activeSeason}E1` : 'Play Episodes') : 'Play Movie'}
             </button>
             <button className="btn btn-secondary btn-lg" onClick={() => navigate(-1)}>
-              ← Back
+              <ArrowLeft size={18} aria-hidden="true" /> Back
             </button>
           </div>
         </div>
@@ -191,8 +196,8 @@ export default function Detail() {
           <div className="detail-section">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0 }}>Episodes ({meta.videos?.length || 0})</h3>
-              <span style={{ fontSize: '0.85rem', color: 'var(--color-accent-primary, #a855f7)', fontWeight: 600 }}>
-                ⚡ Click any episode to open stream list
+              <span style={{ fontSize: '0.85rem', color: 'var(--color-accent-primary, #a855f7)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <Zap size={14} aria-hidden="true" /> Click any episode to open stream list
               </span>
             </div>
 
@@ -239,9 +244,10 @@ export default function Detail() {
                       e.stopPropagation()
                       handlePlay(ep.id)
                     }}
+                    aria-label={`Play ${ep.title || `Episode ${ep.episode || idx + 1}`}`}
                     title="Choose stream & play"
                   >
-                    ▶
+                    <Play size={16} fill="currentColor" aria-hidden="true" />
                   </button>
                 </div>
               ))}

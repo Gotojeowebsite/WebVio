@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Play, Info, Star, Cpu } from 'lucide-react'
 import { useAddonStore } from '../store/addon-store'
 import { useAuthStore } from '../store/auth-store'
 import { AddonClient, MetaPreview } from '../api/addon-client'
@@ -297,8 +298,8 @@ export default function Home() {
   }, [heroItems])
 
   const continueLabel = simklConnected
-    ? '▶ Continue Watching  •  📊 Simkl'
-    : '▶ Continue Watching'
+    ? 'Continue Watching • Simkl'
+    : 'Continue Watching'
 
   return (
     <div className="home-page">
@@ -334,7 +335,11 @@ export default function Home() {
             )}
             <div className="hero-meta">
               {hero.year && <span>{hero.year}</span>}
-              {hero.imdbRating && <span>⭐ {hero.imdbRating}</span>}
+              {hero.imdbRating && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <Star size={14} fill="#f5c518" color="#f5c518" aria-hidden="true" /> {hero.imdbRating}
+                </span>
+              )}
               {hero.genres?.slice(0, 3).map(g => (
                 <span key={g} className="badge">
                   {g}
@@ -347,14 +352,14 @@ export default function Home() {
                 className="btn btn-primary btn-lg"
                 onClick={() => navigate(`/detail/${hero.type}/${encodeURIComponent(hero.id)}`)}
               >
-                ▶ Play
+                <Play size={18} fill="currentColor" aria-hidden="true" /> Play
               </button>
               <button
                 type="button"
                 className="btn btn-secondary btn-lg"
                 onClick={() => navigate(`/detail/${hero.type}/${encodeURIComponent(hero.id)}`)}
               >
-                ℹ️ More Info
+                <Info size={18} aria-hidden="true" /> More Info
               </button>
               <button
                 type="button"
@@ -362,7 +367,7 @@ export default function Home() {
                 onClick={() => navigate(`/wasm-player`)}
                 style={{ marginLeft: '10px', background: '#9c27b0' }}
               >
-                🧪 Test Wasm Decoder
+                <Cpu size={18} aria-hidden="true" /> Test Wasm Decoder
               </button>
             </div>
           </div>
@@ -378,6 +383,7 @@ export default function Home() {
                     setHeroIndex(i)
                     setHero(heroItems[i])
                   }}
+                  aria-label={`Go to slide ${i + 1}`}
                   title={`Slide ${i + 1}`}
                 />
               ))}

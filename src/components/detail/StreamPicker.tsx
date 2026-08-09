@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Link, Zap, Magnet, Globe, Users, X, Inbox } from 'lucide-react'
 import { Meta, Stream, AddonClient } from '../../api/addon-client'
 import { useAddonStore } from '../../store/addon-store'
 import { useAuthStore } from '../../store/auth-store'
@@ -206,7 +207,7 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
       
       if (!url) {
         if (stream.infoHash && !torboxConnected) {
-          setError('Connect TorBox in Settings to instantly stream torrents, or pick a direct stream (🔗)')
+          setError('Connect TorBox in Settings to instantly stream torrents, or pick a direct stream')
         } else {
           setError('Could not resolve stream URL. Try another stream.')
         }
@@ -280,7 +281,9 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
               {episodeHeader}
             </p>
           </div>
-          <button className="modal-close btn-ghost" onClick={onClose}>✕</button>
+          <button className="modal-close btn-ghost" onClick={onClose} aria-label="Close stream selector">
+            <X size={20} aria-hidden="true" />
+          </button>
         </div>
 
         {/* Filter tabs */}
@@ -294,14 +297,16 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
           <button
             className={`stream-filter-tab ${filter === 'cached' ? 'active' : ''}`}
             onClick={() => setFilter('cached')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
           >
-            ⚡ Cached ({cachedCount})
+            <Zap size={14} aria-hidden="true" /> Cached ({cachedCount})
           </button>
           <button
             className={`stream-filter-tab ${filter === 'direct' ? 'active' : ''}`}
             onClick={() => setFilter('direct')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
           >
-            🔗 Direct / Free ({directCount})
+            <Link size={14} aria-hidden="true" /> Direct / Free ({directCount})
           </button>
         </div>
 
@@ -322,7 +327,8 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
 
           {!loading && filteredStreams.length === 0 && (
             <div className="stream-empty">
-              <p>😔 No streams found for this episode</p>
+              <Inbox size={40} aria-hidden="true" style={{ marginBottom: '12px', opacity: 0.5 }} />
+              <p>No streams found for this episode</p>
               <p className="text-sm text-muted">Try connecting TorBox in Settings for instant debrid streaming</p>
             </div>
           )}
@@ -338,13 +344,22 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
                   key={`${stream.infoHash || stream.url || index}-${index}`}
                   className={`stream-item ${isResolving ? 'resolving' : ''}`}
                   onClick={() => !resolving && handleStreamSelect(stream)}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Play stream ${info.cleanTitle}`}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      if (!resolving) handleStreamSelect(stream)
+                    }
+                  }}
                 >
                   <div className="stream-item-header">
                     <div className="stream-item-left">
-                      <span className="stream-type-icon">
-                        {streamType === 'direct' && '🔗'}
-                        {streamType === 'torrent' && (stream.isCached ? '⚡' : '🧲')}
-                        {streamType === 'external' && '🌐'}
+                      <span className="stream-type-icon" aria-hidden="true">
+                        {streamType === 'direct' && <Link size={18} />}
+                        {streamType === 'torrent' && (stream.isCached ? <Zap size={18} /> : <Magnet size={18} />)}
+                        {streamType === 'external' && <Globe size={18} />}
                       </span>
                       <div className="stream-item-info">
                         <p className="stream-item-title">
@@ -357,7 +372,9 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
                             </span>
                           )}
                           {stream.isCached && (
-                            <span className="badge badge-cached">⚡ CACHED</span>
+                            <span className="badge badge-cached" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                              <Zap size={12} aria-hidden="true" /> CACHED
+                            </span>
                           )}
                           {stream.isCached === false && stream.infoHash && (
                             <span className="badge badge-uncached">UNCACHED</span>
@@ -374,8 +391,8 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
                           {info.seeders !== null && (
                             <span className={`stream-peers ${
                               info.seeders > 50 ? 'healthy' : info.seeders > 10 ? 'average' : 'poor'
-                            }`}>
-                              👤 {info.seeders}
+                            }`} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                              <Users size={14} aria-hidden="true" /> {info.seeders}
                             </span>
                           )}
                         </div>
@@ -395,7 +412,7 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
         <div className="stream-picker-footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {!torboxConnected && streams.some(s => s.infoHash) && (
             <p className="text-xs text-muted">
-              💡 Connect your TorBox account in Settings to unlock high-speed torrent streams. Direct streams (🔗) play for free!
+              Connect your TorBox account in Settings to unlock high-speed torrent streams. Direct streams play for free!
             </p>
           )}
           <button 
@@ -406,7 +423,7 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
               navigate('/wasm-player')
             }}
           >
-            🧪 Got an unsupported local file? Decode it with our WASM Engine
+            Got an unsupported local file? Decode it with our WASM Engine
           </button>
         </div>
       </div>
