@@ -1,76 +1,110 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
 
 :root {
-  /* Nuvio Deep Space Palette */
-  --color-bg-base: #0A0A0F;
-  --color-bg-elevated: #14141E;
-  --color-surface-1: #1C1C28;
-  --color-surface-2: #242432;
-  
-  --color-accent-primary: #a855f7; /* Vibrant violet */
-  --color-accent-secondary: #f472b6; /* Neon pink glow */
-  --color-accent-gradient: linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-secondary));
-  
-  --color-text-primary: #f8f8f8;
-  --color-text-secondary: rgba(255, 255, 255, 0.7);
-  --color-text-muted: rgba(255, 255, 255, 0.4);
-  
+  /* Color — keep existing, add these */
+  --bg-primary: #030407;
+  --bg-elevated: #08090d;
+  --bg-glass: rgba(8, 9, 13, 0.85);
+  --accent-violet: #8b5cf6;
+  --accent-magenta: #d946ef;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;   /* new — for body copy that needs more contrast than muted */
+  --text-muted: #64748b;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(139, 92, 246, 0.35);
+  --focus-ring: 0 0 0 3px rgba(139, 92, 246, 0.5);
+
+  /* Spacing scale — use for ALL margin/padding/gap, no bare px values elsewhere */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* Radius scale */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 999px;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.55);
+  --shadow-glow: 0 0 24px rgba(139, 92, 246, 0.35);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+  --duration-slow: 400ms;
+
+  /* Type scale — fluid where noted */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.5rem;
+  --text-2xl: clamp(1.75rem, 1.4rem + 1.5vw, 2.5rem);
+  --text-hero: clamp(2.25rem, 1.6rem + 3vw, 4rem);
+
+  /* Legacy & semantic aliases */
+  --color-bg-base: var(--bg-primary);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-surface-1: #10121a;
+  --color-surface-2: #161822;
+  --color-accent-primary: var(--accent-violet);
+  --color-accent-secondary: var(--accent-magenta);
+  --color-accent-gradient: linear-gradient(135deg, var(--accent-violet), var(--accent-magenta));
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-error: #ef4444;
-  
-  --color-glass: rgba(20, 20, 30, 0.6);
-  --color-glass-border: rgba(168, 85, 247, 0.15);
-  --color-glow-border: rgba(168, 85, 247, 0.4);
-
-  /* Typography */
+  --color-glass: var(--bg-glass);
+  --color-glass-border: var(--border-subtle);
+  --color-glow-border: var(--border-strong);
   --font-family-base: 'Outfit', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  
-  --font-size-xs: 0.75rem;
-  --font-size-sm: 0.875rem;
-  --font-size-base: 1rem;
-  --font-size-lg: 1.125rem;
-  --font-size-xl: 1.25rem;
-  --font-size-2xl: 1.5rem;
-  --font-size-3xl: 1.875rem;
-  --font-size-4xl: 2.5rem;
-  --font-size-5xl: 3.5rem;
-
-  /* Spacing */
-  --spacing-1: 0.25rem;
-  --spacing-2: 0.5rem;
-  --spacing-3: 0.75rem;
-  --spacing-4: 1rem;
-  --spacing-5: 1.25rem;
-  --spacing-6: 1.5rem;
-  --spacing-8: 2rem;
-  --spacing-10: 2.5rem;
-  --spacing-12: 3rem;
-  --spacing-16: 4rem;
-
-  /* Border Radius - Nuvio uses soft roundings */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.5rem;
-  --radius-2xl: 2rem;
-  --radius-full: 9999px;
-
-  /* Shadows & Glows */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.6);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.7);
-  --shadow-lg: 0 16px 40px -4px rgba(0, 0, 0, 0.9);
-  --shadow-xl: 0 32px 64px -8px rgba(0, 0, 0, 1);
-  --shadow-glow: 0 0 30px rgba(168, 85, 247, 0.4);
-
-  /* Transitions */
-  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-normal: 280ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 450ms cubic-bezier(0.4, 0, 0.2, 1);
-  
-  /* Layout */
   --max-width: 1560px;
   --navbar-height: 80px;
+
+  --spacing-1: var(--space-1);
+  --spacing-2: var(--space-2);
+  --spacing-3: var(--space-3);
+  --spacing-4: var(--space-4);
+  --spacing-5: var(--space-5);
+  --spacing-6: var(--space-6);
+  --spacing-8: var(--space-8);
+  --spacing-10: 40px;
+  --spacing-12: var(--space-7);
+  --spacing-16: var(--space-8);
+
+  --transition-fast: var(--duration-fast) var(--ease-out);
+  --transition-normal: var(--duration-base) var(--ease-out);
+  --transition-slow: var(--duration-slow) var(--ease-out);
+
+  --font-size-xs: var(--text-xs);
+  --font-size-sm: var(--text-sm);
+  --font-size-base: var(--text-base);
+  --font-size-lg: var(--text-lg);
+  --font-size-xl: var(--text-xl);
+  --font-size-2xl: var(--text-2xl);
+  --font-size-3xl: 1.875rem;
+  --font-size-4xl: var(--text-2xl);
+  --font-size-5xl: var(--text-hero);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ==========================================================================

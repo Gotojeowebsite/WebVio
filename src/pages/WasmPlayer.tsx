@@ -62,13 +62,13 @@ export default function WasmPlayer() {
     
     // Read the MP4 output
     const mp4Data = await ffmpeg.readFile('output.mp4')
-    const mp4Blob = new Blob([(mp4Data as Uint8Array).buffer], { type: 'video/mp4' })
+    const mp4Blob = new Blob([new Uint8Array(mp4Data as Uint8Array)], { type: 'video/mp4' })
     const url = URL.createObjectURL(mp4Blob)
     setVideoSrc(url)
 
     // Read the WAV output and start transcription
     const wavData = await ffmpeg.readFile('audio.wav')
-    const wavBlob = new Blob([(wavData as Uint8Array).buffer], { type: 'audio/wav' })
+    const wavBlob = new Blob([new Uint8Array(wavData as Uint8Array)], { type: 'audio/wav' })
     const wavUrl = URL.createObjectURL(wavBlob)
     
     transcribeAudio(wavUrl)
@@ -97,11 +97,11 @@ export default function WasmPlayer() {
         chunk_length_s: 30,
         stride_length_s: 5,
         return_timestamps: true
-      })
+      }) as any
       
-      if (Array.isArray(result.chunks)) {
+      if (Array.isArray(result?.chunks)) {
         setTranscript(result.chunks)
-      } else {
+      } else if (result?.text) {
         setTranscript([{ text: result.text }])
       }
       

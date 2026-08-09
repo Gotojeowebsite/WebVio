@@ -24,11 +24,11 @@
 .continue-watching-section .catalog-title {
   font-size: var(--font-size-lg);
   font-weight: 800;
-  background: linear-gradient(90deg, #d8b4fe, #f472b6);
+  background: var(--color-accent-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-shadow: 0 0 15px rgba(216, 180, 254, 0.3);
+  text-shadow: 0 0 15px rgba(139, 92, 246, 0.3);
 }
 
 /* ── Hero ───────────────────────────────────────────────── */
@@ -129,9 +129,9 @@
 }
 
 .hero-dot-active {
-  background: #d8b4fe;
+  background: var(--accent-violet);
   transform: scale(1.4);
-  box-shadow: 0 0 10px rgba(216, 180, 254, 0.8);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.8);
 }
 
 /* ── Catalogs ───────────────────────────────────────────── */

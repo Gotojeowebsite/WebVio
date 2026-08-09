@@ -64,10 +64,10 @@
 }
 
 .sidebar-item.active {
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(244, 114, 182, 0.15));
-  color: #d8b4fe; /* Bright violet accent text */
-  border-color: rgba(168, 85, 247, 0.4);
-  box-shadow: 0 0 20px rgba(168, 85, 247, 0.2);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.15));
+  color: var(--accent-violet); /* Bright violet accent text */
+  border-color: var(--border-strong);
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.2);
 }
 
 .sidebar-icon {
