@@ -151,15 +151,15 @@ export default function Detail() {
           )}
 
           <div className="detail-info">
-            {meta.year && <span>{meta.year}</span>}
-            {meta.runtime && <span>{meta.runtime}</span>}
+            {meta.year && <span className="detail-pill">{meta.year}</span>}
+            {meta.runtime && <span className="detail-pill">{meta.runtime}</span>}
             {meta.imdbRating && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <Star size={14} fill="#f5c518" color="#f5c518" aria-hidden="true" /> {meta.imdbRating}
+              <span className="detail-pill detail-pill-rating">
+                <Star size={13} fill="#f5c518" color="#f5c518" aria-hidden="true" /> {meta.imdbRating}
               </span>
             )}
             {meta.genres?.slice(0, 4).map(g => (
-              <span key={g} className="badge">{g}</span>
+              <span key={g} className="detail-pill">{g}</span>
             ))}
           </div>
 
@@ -168,7 +168,7 @@ export default function Detail() {
           )}
 
           <div className="detail-actions">
-            <button className="btn btn-primary btn-lg" onClick={() => handlePlay()}>
+            <button className="btn btn-primary btn-lg detail-play-btn" onClick={() => handlePlay()}>
               <Play size={18} fill="currentColor" aria-hidden="true" /> {isShow ? (episodesInSeason.length > 0 ? `Play S${activeSeason}E1` : 'Play Episodes') : 'Play Movie'}
             </button>
             <button className="btn btn-secondary btn-lg" onClick={() => navigate(-1)}>
@@ -183,7 +183,7 @@ export default function Detail() {
         {meta.cast && meta.cast.length > 0 && (
           <div className="detail-section">
             <h3>Cast</h3>
-            <div className="detail-cast">
+            <div className="detail-cast" tabIndex={0} aria-label="Cast list">
               {meta.cast.slice(0, 10).map(actor => (
                 <span key={actor} className="detail-cast-item">{actor}</span>
               ))}
@@ -194,20 +194,37 @@ export default function Detail() {
         {/* Seasons & Episodes Section for Series & Anime */}
         {isShow && (
           <div className="detail-section">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
               <h3 style={{ margin: 0 }}>Episodes ({meta.videos?.length || 0})</h3>
-              <span style={{ fontSize: '0.85rem', color: 'var(--color-accent-primary, #a855f7)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--accent-violet)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                 <Zap size={14} aria-hidden="true" /> Click any episode to open stream list
               </span>
             </div>
 
             {seasons.length > 1 && (
-              <div className="season-tabs">
-                {seasons.map(s => (
+              <div className="season-tabs" role="tablist" aria-label="Seasons">
+                {seasons.map((s, idx) => (
                   <button
                     key={s}
-                    className={`tab-btn ${activeSeason === s ? 'tab-active' : ''}`}
+                    id={`season-tab-${s}`}
+                    role="tab"
+                    aria-selected={activeSeason === s}
+                    tabIndex={activeSeason === s ? 0 : -1}
+                    className={`season-tab ${activeSeason === s ? 'active' : ''}`}
                     onClick={() => setSelectedSeason(s)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowRight') {
+                        e.preventDefault()
+                        const nextIdx = (idx + 1) % seasons.length
+                        setSelectedSeason(seasons[nextIdx])
+                        document.getElementById(`season-tab-${seasons[nextIdx]}`)?.focus()
+                      } else if (e.key === 'ArrowLeft') {
+                        e.preventDefault()
+                        const prevIdx = (idx - 1 + seasons.length) % seasons.length
+                        setSelectedSeason(seasons[prevIdx])
+                        document.getElementById(`season-tab-${seasons[prevIdx]}`)?.focus()
+                      }
+                    }}
                   >
                     Season {s}
                   </button>
