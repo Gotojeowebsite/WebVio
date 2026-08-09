@@ -19,25 +19,25 @@ export default function WasmPlayer() {
   const [transcript, setTranscript] = useState<{text: string}[]>([])
 
   useEffect(() => {
+    const loadFfmpeg = async () => {
+      setLoadingText('Loading FFmpeg (WASM)...')
+      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
+      
+      ffmpeg.on('progress', ({ progress }) => {
+        setProgress(progress * 100)
+      })
+
+      await ffmpeg.load({
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+      })
+      
+      setLoaded(true)
+      setLoadingText('Ready')
+    }
+
     loadFfmpeg()
-  }, [])
-
-  const loadFfmpeg = async () => {
-    setLoadingText('Loading FFmpeg (WASM)...')
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
-    
-    ffmpeg.on('progress', ({ progress, time }) => {
-      setProgress(progress * 100)
-    })
-
-    await ffmpeg.load({
-      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-    })
-    
-    setLoaded(true)
-    setLoadingText('Ready')
-  }
+  }, [ffmpeg])
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return

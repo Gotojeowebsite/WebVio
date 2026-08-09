@@ -1,10 +1,30 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Link, Zap, Magnet, Globe, Users, X, Inbox } from 'lucide-react'
+import {
+  Link,
+  Zap,
+  Magnet,
+  Globe,
+  Users,
+  X,
+  Inbox,
+  Search,
+  Play,
+  Star,
+  ArrowUpDown,
+  Sparkles,
+  Tv,
+  Film,
+  AlertCircle,
+  Download,
+  CheckCircle2,
+  Loader2
+} from 'lucide-react'
 import { Meta, Stream, AddonClient } from '../../api/addon-client'
 import { useAddonStore } from '../../store/addon-store'
 import { useAuthStore } from '../../store/auth-store'
 import { usePlayerStore, EnrichedStream } from '../../store/player-store'
+import { useDownloadStore } from '../../store/download-store'
 import { parseStreamInfo, resolveStreamUrl, batchCheckCached } from '../../utils/stream-resolver'
 import './stream-picker.css'
 
@@ -16,7 +36,8 @@ interface Props {
   meta: Meta
 }
 
-type FilterTab = 'all' | 'cached' | 'direct'
+type FilterTab = 'all' | '4k' | '1080p' | '720p' | 'sd' | 'cached' | 'direct'
+type SortOption = 'best' | 'quality' | 'size' | 'seeders'
 
 // Default high-performance stream providers
 const DEFAULT_STREAM_PROVIDERS = [
@@ -24,17 +45,32 @@ const DEFAULT_STREAM_PROVIDERS = [
   'https://mediafusion.elfhosted.com/manifest.json',
 ]
 
+const QUALITY_ORDER: Record<string, number> = {
+  '4K': 4,
+  '1080p': 3,
+  '720p': 2,
+  '480p': 1,
+  'SD': 1,
+}
+
 export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: Props) {
   const navigate = useNavigate()
   const modalRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const { addons } = useAddonStore()
   const { torboxApiKey, torboxConnected } = useAuthStore()
   const { setStream, setMeta, setVideo } = usePlayerStore()
+  const { addDownload } = useDownloadStore()
+  const [downloadSuccess, setDownloadSuccess] = useState('')
+  const [downloadingKey, setDownloadingKey] = useState<string | null>(null)
+
   const [streams, setStreams] = useState<EnrichedStream[]>([])
   const [loading, setLoading] = useState(true)
   const [resolving, setResolving] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState<FilterTab>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState<SortOption>('best')
 
   // Focus trap & Escape key listener
   useEffect(() => {
@@ -62,6 +98,17 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, onClose])
+
+  // Auto-focus search bar when opened
+  useEffect(() => {
+    if (isOpen) {
+      setSearchQuery('')
+      setFilter('all')
+      setSortBy('best')
+      setDownloadSuccess('')
+      setDownloadingKey(null)
+    }
+  }, [isOpen])
 
   const fetchStreams = useCallback(async () => {
     setLoading(true)
@@ -129,8 +176,18 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
                     addonName,
                     addonId,
                     quality: info.quality || undefined,
-                    size: info.size || undefined,
+                    source: info.source || undefined,
                     codec: info.codec || undefined,
+                    audio: info.audio || undefined,
+                    size: info.size || undefined,
+                    sizeBytes: info.sizeBytes || undefined,
+                    bitrate: info.bitrate || undefined,
+                    releaseGroup: info.releaseGroup || undefined,
+                    cleanTitle: info.cleanTitle,
+                    starRating: info.starRating,
+                    health: info.health,
+                    hdr: info.hdr,
+                    seeders: info.seeders,
                     isCached: undefined,
                   } as EnrichedStream
                 })
@@ -163,7 +220,12 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
           const cached = await batchCheckCached(hashes, torboxApiKey)
           for (const stream of allStreams) {
             if (stream.infoHash) {
-              stream.isCached = cached[stream.infoHash.toLowerCase()] || false
+              const isCached = cached[stream.infoHash.toLowerCase()] || false
+              stream.isCached = isCached
+              if (isCached) {
+                stream.health = 'healthy'
+                stream.starRating = Math.min(5.0, (stream.starRating || 3.5) + 0.4)
+              }
             }
           }
         } catch {
@@ -176,40 +238,12 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
     const seen = new Set<string>()
     const uniqueStreams: EnrichedStream[] = []
     for (const s of allStreams) {
-      const key = s.infoHash || s.url || s.title || JSON.stringify(s)
+      const key = s.infoHash ? s.infoHash.toLowerCase() : s.url ? s.url : s.title || JSON.stringify(s)
       if (!seen.has(key)) {
         seen.add(key)
         uniqueStreams.push(s)
       }
     }
-
-    // Sort: Direct/Free & Cached first, then by resolution (4K > 1080p > 720p)
-    const qualityOrder: Record<string, number> = { '4K': 4, '1080p': 3, '720p': 2, '480p': 1 }
-    uniqueStreams.sort((a, b) => {
-      // Direct URLs first
-      if (a.url && !b.url) return -1
-      if (!a.url && b.url) return 1
-      // Then cached torrents
-      if (a.isCached && !b.isCached) return -1
-      if (!a.isCached && b.isCached) return 1
-      // Then quality
-      const qa = qualityOrder[a.quality || ''] || 0
-      const qb = qualityOrder[b.quality || ''] || 0
-      if (qb !== qa) return qb - qa
-      
-      const infoA = parseStreamInfo(a)
-      const infoB = parseStreamInfo(b)
-      
-      // Then file size (largest first)
-      const sizeA = infoA.sizeBytes || 0
-      const sizeB = infoB.sizeBytes || 0
-      if (sizeB !== sizeA) return sizeB - sizeA
-      
-      // Then seeders
-      const sa = infoA.seeders || 0
-      const sb = infoB.seeders || 0
-      return sb - sa
-    })
 
     setStreams(uniqueStreams)
     setLoading(false)
@@ -227,17 +261,18 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
       return
     }
 
-    setResolving(stream.infoHash || stream.url || 'resolving')
+    const streamKey = stream.infoHash || stream.url || 'resolving'
+    setResolving(streamKey)
     setError('')
 
     try {
       const url = await resolveStreamUrl(stream, torboxApiKey || undefined)
-      
+
       if (!url) {
         if (stream.infoHash && !torboxConnected) {
-          setError('Connect TorBox in Settings to instantly stream torrents, or pick a direct stream')
+          setError('Connect your TorBox account in Settings to stream torrents instantly, or select a Direct stream.')
         } else {
-          setError('Could not resolve stream URL. Try another stream.')
+          setError('Could not resolve stream URL. Please try another stream provider.')
         }
         setResolving(null)
         return
@@ -253,7 +288,6 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
         } : null
       )
 
-      const info = parseStreamInfo(stream)
       setMeta(meta)
       setVideo(matchingVideo)
 
@@ -266,7 +300,7 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
       setStream({
         url,
         title: `${meta.name}${episodeLabel ? ` • ${episodeLabel}` : ''}`,
-        quality: info.quality || undefined,
+        quality: stream.quality,
         source: stream.addonName,
       })
 
@@ -279,159 +313,529 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
     }
   }
 
-  const filteredStreams = streams.filter(s => {
-    if (filter === 'cached') return s.isCached === true
-    if (filter === 'direct') return !!s.url
-    return true
-  })
+  const handleDownloadStream = async (e: React.MouseEvent, stream: EnrichedStream) => {
+    e.stopPropagation()
+    const streamKey = stream.infoHash || stream.url || `stream-dl`
+    setDownloadingKey(streamKey)
+    setError('')
 
-  const cachedCount = streams.filter(s => s.isCached).length
-  const directCount = streams.filter(s => s.url).length
+    try {
+      const url = await resolveStreamUrl(stream, torboxApiKey || undefined)
+      if (!url) {
+        if (stream.infoHash && !torboxConnected) {
+          setError('Connect TorBox in Settings to download torrent streams, or select a direct stream.')
+        } else {
+          setError('Could not resolve stream download link. Please try another stream.')
+        }
+        setDownloadingKey(null)
+        return
+      }
+
+      const matchingVideo = meta.videos?.find((v) => v.id === videoId) || (
+        videoId.includes(':') ? {
+          id: videoId,
+          title: `Episode ${videoId.split(':')[2] || videoId}`,
+          season: Number(videoId.split(':')[1]) || 1,
+          episode: Number(videoId.split(':')[2]) || 1,
+        } : null
+      )
+
+      addDownload({ ...stream, url }, meta, matchingVideo)
+      const label = matchingVideo?.season && matchingVideo?.episode
+        ? `${meta.name} S${matchingVideo.season}E${matchingVideo.episode}`
+        : meta.name
+      setDownloadSuccess(`Added "${label}" to Download Manager`)
+      setTimeout(() => setDownloadSuccess(''), 4000)
+    } catch (err: any) {
+      setError(err.message || 'Failed to start download')
+    } finally {
+      setDownloadingKey(null)
+    }
+  }
+
+  // Count metrics for tabs
+  const count4K = useMemo(() => streams.filter(s => s.quality === '4K').length, [streams])
+  const count1080p = useMemo(() => streams.filter(s => s.quality === '1080p').length, [streams])
+  const count720p = useMemo(() => streams.filter(s => s.quality === '720p').length, [streams])
+  const countSD = useMemo(() => streams.filter(s => s.quality === '480p' || s.quality === 'SD').length, [streams])
+  const countCached = useMemo(() => streams.filter(s => s.isCached === true).length, [streams])
+  const countDirect = useMemo(() => streams.filter(s => !!s.url).length, [streams])
+
+  // Filtered & Sorted Stream Pipeline
+  const filteredStreams = useMemo(() => {
+    return streams.filter(s => {
+      // 1. Category Tab Filter
+      if (filter === '4k' && s.quality !== '4K') return false
+      if (filter === '1080p' && s.quality !== '1080p') return false
+      if (filter === '720p' && s.quality !== '720p') return false
+      if (filter === 'sd' && s.quality !== '480p' && s.quality !== 'SD') return false
+      if (filter === 'cached' && s.isCached !== true) return false
+      if (filter === 'direct' && !s.url) return false
+
+      // 2. Search Query Filter
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim()
+        const searchable = [
+          s.cleanTitle,
+          s.title,
+          s.name,
+          s.addonName,
+          s.quality,
+          s.source,
+          s.codec,
+          s.audio,
+          s.releaseGroup,
+          s.bitrate,
+          s.size,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+
+        if (!searchable.includes(query)) return false
+      }
+
+      return true
+    }).sort((a, b) => {
+      if (sortBy === 'quality') {
+        const qa = QUALITY_ORDER[a.quality || ''] || 0
+        const qb = QUALITY_ORDER[b.quality || ''] || 0
+        if (qb !== qa) return qb - qa
+        return (b.starRating || 0) - (a.starRating || 0)
+      }
+
+      if (sortBy === 'size') {
+        const sizeA = a.sizeBytes || 0
+        const sizeB = b.sizeBytes || 0
+        if (sizeB !== sizeA) return sizeB - sizeA
+        return (b.starRating || 0) - (a.starRating || 0)
+      }
+
+      if (sortBy === 'seeders') {
+        const sa = a.url ? 9999 : a.isCached ? 8888 : a.seeders || 0
+        const sb = b.url ? 9999 : b.isCached ? 8888 : b.seeders || 0
+        return sb - sa
+      }
+
+      // Default: 'best'
+      // 1. Direct URLs & Cached streams highest priority
+      const scoreA = (a.url ? 200 : a.isCached ? 100 : 0) + (QUALITY_ORDER[a.quality || ''] || 0) * 10 + (a.starRating || 0) * 5
+      const scoreB = (b.url ? 200 : b.isCached ? 100 : 0) + (QUALITY_ORDER[b.quality || ''] || 0) * 10 + (b.starRating || 0) * 5
+      if (scoreB !== scoreA) return scoreB - scoreA
+
+      // Fallback: seeders & size
+      const seedersA = a.seeders || 0
+      const seedersB = b.seeders || 0
+      if (seedersB !== seedersA) return seedersB - seedersA
+
+      return (b.sizeBytes || 0) - (a.sizeBytes || 0)
+    })
+  }, [streams, filter, searchQuery, sortBy])
 
   if (!isOpen) return null
 
-  // Format episode title in header if videoId has episode info
+  // Format header episode context
   const matchingVideo = meta.videos?.find(v => v.id === videoId)
-  const episodeHeader = matchingVideo?.season && matchingVideo?.episode
-    ? `Season ${matchingVideo.season} • Episode ${matchingVideo.episode}${matchingVideo.title ? ` - ${matchingVideo.title}` : ''}`
-    : videoId.includes(':')
-    ? `Season ${videoId.split(':')[1] || 1} • Episode ${videoId.split(':')[2] || 1}`
-    : meta.name
+  const isSeries = type === 'series' || type === 'tv' || type === 'anime' || (meta.videos && meta.videos.length > 0)
+  
+  let episodeHeader = ''
+  let episodeSubhead = ''
+
+  if (matchingVideo?.season && matchingVideo?.episode) {
+    episodeHeader = `S${matchingVideo.season} E${matchingVideo.episode}`
+    episodeSubhead = matchingVideo.title ? `${matchingVideo.title} • ${meta.name}` : meta.name
+  } else if (videoId.includes(':')) {
+    const parts = videoId.split(':')
+    const season = parts[1] || '1'
+    const episode = parts[2] || '1'
+    episodeHeader = `S${season} E${episode}`
+    episodeSubhead = meta.name
+  } else {
+    episodeHeader = meta.name
+    episodeSubhead = meta.releaseInfo ? `${meta.releaseInfo} • ${meta.genres?.join(', ') || type}` : (meta.genres?.join(', ') || type)
+  }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="stream-picker-modal modal-content" ref={modalRef} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="stream-picker-title">
-        {/* Header */}
-        <div className="modal-header">
-          <div>
-            <h3 id="stream-picker-title" className="stream-picker-title">Select a Stream</h3>
-            <p className="stream-picker-subtitle" style={{ color: 'var(--accent-magenta)', fontWeight: 600 }}>
-              {episodeHeader}
-            </p>
+    <div className="stream-modal-overlay" onClick={onClose}>
+      <div
+        className="stream-picker-modal card-glass"
+        ref={modalRef}
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stream-picker-title"
+        aria-describedby="stream-picker-context"
+      >
+        {/* Top Header Bar */}
+        <div className="stream-modal-header">
+          <div className="stream-header-left">
+            <div className="stream-header-icon-box" aria-hidden="true">
+              {isSeries ? <Tv size={22} className="stream-header-icon" /> : <Film size={22} className="stream-header-icon" />}
+            </div>
+            <div className="stream-header-text">
+              <div className="stream-header-title-row">
+                <h3 id="stream-picker-title" className="stream-picker-title">
+                  Select a Stream
+                </h3>
+                <span className="stream-badge-count">
+                  {filteredStreams.length} {filteredStreams.length === 1 ? 'stream' : 'streams'}
+                </span>
+              </div>
+              <p id="stream-picker-context" className="stream-picker-subtitle">
+                <span className="stream-context-tag">{episodeHeader}</span>
+                <span className="stream-context-dot">•</span>
+                <span className="stream-context-name">{episodeSubhead}</span>
+              </p>
+            </div>
           </div>
-          <button className="modal-close btn-ghost" onClick={onClose} aria-label="Close stream selector">
+
+          <button
+            className="stream-modal-close-btn"
+            onClick={onClose}
+            aria-label="Close stream selector modal"
+          >
             <X size={20} aria-hidden="true" />
           </button>
         </div>
 
-        {/* Filter tabs */}
+        {/* Controls Toolbar: Search & Sort */}
+        <div className="stream-controls-toolbar">
+          <div className="stream-search-container">
+            <Search size={16} className="stream-search-icon" aria-hidden="true" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              className="stream-search-input"
+              placeholder="Search streams (e.g. 4K, Atmos, Remux, FLUX)..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              aria-label="Search streams"
+            />
+            {searchQuery && (
+              <button
+                className="stream-search-clear"
+                onClick={() => setSearchQuery('')}
+                aria-label="Clear search query"
+              >
+                <X size={14} aria-hidden="true" />
+              </button>
+            )}
+          </div>
+
+          <div className="stream-sort-container">
+            <label htmlFor="stream-sort-select" className="stream-sort-label">
+              <ArrowUpDown size={14} aria-hidden="true" />
+              <span>Sort:</span>
+            </label>
+            <select
+              id="stream-sort-select"
+              className="stream-sort-select"
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as SortOption)}
+              aria-label="Sort streams by"
+            >
+              <option value="best">Best Match</option>
+              <option value="quality">Quality (High to Low)</option>
+              <option value="size">Size / Bitrate</option>
+              <option value="seeders">Seeders / Speed</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Filter Tabs Bar */}
         <div className="stream-filter-bar">
           <button
             className={`stream-filter-tab ${filter === 'all' ? 'active' : ''}`}
             onClick={() => setFilter('all')}
           >
-            All Streams ({streams.length})
+            All <span className="tab-count">{streams.length}</span>
           </button>
           <button
-            className={`stream-filter-tab ${filter === 'cached' ? 'active' : ''}`}
+            className={`stream-filter-tab tab-4k ${filter === '4k' ? 'active' : ''}`}
+            onClick={() => setFilter('4k')}
+          >
+            4K <span className="tab-count">{count4K}</span>
+          </button>
+          <button
+            className={`stream-filter-tab tab-1080p ${filter === '1080p' ? 'active' : ''}`}
+            onClick={() => setFilter('1080p')}
+          >
+            1080p <span className="tab-count">{count1080p}</span>
+          </button>
+          <button
+            className={`stream-filter-tab tab-720p ${filter === '720p' ? 'active' : ''}`}
+            onClick={() => setFilter('720p')}
+          >
+            720p <span className="tab-count">{count720p}</span>
+          </button>
+          {countSD > 0 && (
+            <button
+              className={`stream-filter-tab tab-sd ${filter === 'sd' ? 'active' : ''}`}
+              onClick={() => setFilter('sd')}
+            >
+              SD <span className="tab-count">{countSD}</span>
+            </button>
+          )}
+          <button
+            className={`stream-filter-tab tab-cached ${filter === 'cached' ? 'active' : ''}`}
             onClick={() => setFilter('cached')}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
           >
-            <Zap size={14} aria-hidden="true" /> Cached ({cachedCount})
+            <Zap size={13} className="tab-icon" aria-hidden="true" />
+            <span>Cached</span>
+            <span className="tab-count">{countCached}</span>
           </button>
           <button
-            className={`stream-filter-tab ${filter === 'direct' ? 'active' : ''}`}
+            className={`stream-filter-tab tab-direct ${filter === 'direct' ? 'active' : ''}`}
             onClick={() => setFilter('direct')}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
           >
-            <Link size={14} aria-hidden="true" /> Direct / Free ({directCount})
+            <Link size={13} className="tab-icon" aria-hidden="true" />
+            <span>Direct / Free</span>
+            <span className="tab-count">{countDirect}</span>
           </button>
         </div>
 
-        {/* Stream list */}
-        <div className="modal-body stream-list-container">
-          {loading && (
-            <div className="stream-list">
-              {Array.from({ length: 6 }).map((_, idx) => (
-                <div key={idx} className="stream-item-skeleton skeleton" />
-              ))}
+        {/* Stream List / Grid Container */}
+        <div className="stream-list-container">
+          {downloadSuccess && (
+            <div className="stream-download-toast" role="status">
+              <CheckCircle2 size={18} className="toast-icon" aria-hidden="true" />
+              <span>{downloadSuccess}</span>
+              <button
+                className="toast-dismiss"
+                onClick={() => setDownloadSuccess('')}
+                aria-label="Dismiss toast"
+              >
+                <X size={14} aria-hidden="true" />
+              </button>
             </div>
           )}
 
           {error && (
-            <div className="stream-error">
-              <p>{error}</p>
+            <div className="stream-error-banner" role="alert">
+              <AlertCircle size={18} className="stream-error-icon" aria-hidden="true" />
+              <div className="stream-error-content">
+                <p className="stream-error-title">Stream Resolution Notice</p>
+                <p className="stream-error-desc">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {loading && (
+            <div className="stream-cards-grid">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div key={idx} className="stream-card-skeleton skeleton" />
+              ))}
             </div>
           )}
 
           {!loading && filteredStreams.length === 0 && (
-            <div className="stream-empty">
-              <Inbox size={40} aria-hidden="true" style={{ marginBottom: '12px', opacity: 0.5 }} />
-              <p>No streams found for this episode</p>
-              <p className="text-sm text-muted">Try connecting TorBox in Settings for instant debrid streaming</p>
+            <div className="stream-empty-state">
+              <Inbox size={48} aria-hidden="true" className="stream-empty-icon" />
+              <h4>No matching streams found</h4>
+              <p className="stream-empty-hint">
+                {searchQuery
+                  ? `No streams matched "${searchQuery}". Try clearing search or selecting another filter tab.`
+                  : filter !== 'all'
+                  ? 'No streams available in this category. Switch to "All" tab to view all sources.'
+                  : 'No stream providers returned results for this video.'}
+              </p>
+              {searchQuery && (
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setSearchQuery('')}
+                  style={{ marginTop: '12px' }}
+                >
+                  Clear Search Filter
+                </button>
+              )}
             </div>
           )}
 
-          {!loading && (
-            <div className="stream-list">
+          {!loading && filteredStreams.length > 0 && (
+            <div className="stream-cards-grid">
               {filteredStreams.map((stream, index) => {
-                const info = parseStreamInfo(stream)
+                const streamKey = stream.infoHash ? stream.infoHash.toLowerCase() : stream.url ? stream.url : `stream-${index}`
                 const isResolving = resolving === (stream.infoHash || stream.url || 'resolving')
+                const isDownloadingThis = downloadingKey === streamKey
                 const streamType = stream.url ? 'direct' : stream.infoHash ? 'torrent' : 'external'
 
                 return (
                   <div
-                    key={`${stream.infoHash || stream.url || index}-${index}`}
-                    className={`stream-item ${isResolving ? 'resolving' : ''}`}
-                    onClick={() => !resolving && handleStreamSelect(stream)}
+                    key={`${streamKey}-${index}`}
+                    className={`stream-card ${isResolving ? 'resolving' : ''}`}
+                    onClick={() => !resolving && !isDownloadingThis && handleStreamSelect(stream)}
                     tabIndex={0}
                     role="button"
-                    aria-label={`Play stream ${info.cleanTitle}`}
-                    onKeyDown={(e) => {
+                    aria-label={`Play stream ${stream.cleanTitle || stream.title}, quality ${stream.quality || 'HD'}`}
+                    onKeyDown={e => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault()
-                        if (!resolving) handleStreamSelect(stream)
+                        if (!resolving && !isDownloadingThis) handleStreamSelect(stream)
                       }
                     }}
                   >
-                    <div className="stream-item-header">
-                      <div className="stream-item-left">
-                        <span className="stream-type-icon" aria-hidden="true">
-                          {streamType === 'direct' && <Link size={18} />}
-                          {streamType === 'torrent' && (stream.isCached ? <Zap size={18} /> : <Magnet size={18} />)}
-                          {streamType === 'external' && <Globe size={18} />}
-                        </span>
-                        <div className="stream-item-info">
-                          <p className="stream-item-title">
-                            {info.cleanTitle}
-                          </p>
-                          <div className="stream-badges-left">
-                            {info.quality && (
-                              <span className={`badge ${info.quality === '4K' ? 'badge-4k' : 'badge-hd'}`}>
-                                {info.quality}
-                              </span>
-                            )}
-                            {stream.isCached && (
-                              <span className="badge badge-cached" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                <Zap size={12} aria-hidden="true" /> CACHED
-                              </span>
-                            )}
-                            {stream.isCached === false && stream.infoHash && (
-                              <span className="badge badge-uncached">UNCACHED</span>
-                            )}
-                            {streamType === 'direct' && (
-                              <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.3)' }}>
-                                FREE DIRECT
-                              </span>
-                            )}
-                            {info.codec && <span className="badge">{info.codec}</span>}
-                            {info.hdr && <span className="badge badge-4k">HDR</span>}
-                            {info.audio && <span className="badge">{info.audio}</span>}
-                            <span className="stream-addon-source">{info.source || stream.addonName}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="stream-meta-right">
-                        {info.size && <span className="stream-size">{info.size}</span>}
-                        {info.seeders !== null && (
-                          <span className={`stream-peers ${
-                            info.seeders > 50 ? 'healthy' : info.seeders > 10 ? 'average' : 'poor'
-                          }`} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                            <Users size={14} aria-hidden="true" /> {info.seeders}
+                    {/* Card Top Row: Type Pill, Health Dot & Rating */}
+                    <div className="stream-card-top-row">
+                      <div className="stream-type-pill-group">
+                        {stream.isCached && (
+                          <span className="stream-type-pill pill-cached">
+                            <Zap size={11} aria-hidden="true" />
+                            <span>CACHED</span>
                           </span>
                         )}
-                        {isResolving && <div className="loading-spinner stream-spinner" />}
+                        {streamType === 'direct' && (
+                          <span className="stream-type-pill pill-direct">
+                            <Link size={11} aria-hidden="true" />
+                            <span>FREE DIRECT</span>
+                          </span>
+                        )}
+                        {stream.isCached === false && stream.infoHash && (
+                          <span className="stream-type-pill pill-uncached">
+                            <Magnet size={11} aria-hidden="true" />
+                            <span>P2P TORRENT</span>
+                          </span>
+                        )}
+                        {streamType === 'external' && (
+                          <span className="stream-type-pill pill-external">
+                            <Globe size={11} aria-hidden="true" />
+                            <span>EXTERNAL</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="stream-card-indicators">
+                        <div className="stream-rating-pill" title={`Rating: ${stream.starRating?.toFixed(1) || '4.5'} / 5.0`}>
+                          <Star size={11} fill="#FF6B00" color="#FF6B00" aria-hidden="true" />
+                          <span>{stream.starRating?.toFixed(1) || '4.5'}</span>
+                        </div>
+                        <span
+                          className={`stream-health-dot health-${stream.health || 'healthy'}`}
+                          title={`Stream health: ${stream.health || 'healthy'}`}
+                          aria-label={`Health: ${stream.health || 'healthy'}`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Card Title & Release Group */}
+                    <div className="stream-card-content">
+                      <div className="stream-card-title-row">
+                        <h4 className="stream-card-title" title={stream.cleanTitle || stream.title}>
+                          {stream.cleanTitle || stream.title || 'Standard Stream'}
+                        </h4>
+                      </div>
+
+                      {stream.releaseGroup && (
+                        <div className="stream-card-group-row">
+                          <span className="stream-release-pill">{stream.releaseGroup}</span>
+                        </div>
+                      )}
+
+                      {/* Vibrant Badges Row */}
+                      <div className="stream-badges-grid">
+                        {stream.quality && (
+                          <span
+                            className={`badge-item ${
+                              stream.quality === '4K'
+                                ? 'badge-quality-4k'
+                                : stream.quality === '1080p'
+                                ? 'badge-quality-1080p'
+                                : stream.quality === '720p'
+                                ? 'badge-quality-720p'
+                                : 'badge-quality-sd'
+                            }`}
+                          >
+                            {stream.quality} {stream.hdr ? 'HDR' : ''}
+                          </span>
+                        )}
+
+                        {stream.source && (
+                          <span className="badge-item badge-source">
+                            {stream.source}
+                          </span>
+                        )}
+
+                        {stream.codec && (
+                          <span className="badge-item badge-codec">
+                            {stream.codec}
+                          </span>
+                        )}
+
+                        {stream.audio && (
+                          <span className="badge-item badge-audio">
+                            {stream.audio}
+                          </span>
+                        )}
+
+                        {stream.size && (
+                          <span className="badge-item badge-metrics">
+                            {stream.size}{stream.bitrate ? ` · ${stream.bitrate}` : ''}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Card Bottom: Provider, Seeders, Play & Download CTAs */}
+                    <div className="stream-card-footer">
+                      <div className="stream-card-meta-left">
+                        <span className="stream-addon-source-pill">
+                          {stream.addonName}
+                        </span>
+
+                        {stream.seeders !== null && stream.seeders !== undefined && (
+                          <span
+                            className={`stream-peers-pill ${
+                              stream.seeders > 50
+                                ? 'peers-healthy'
+                                : stream.seeders > 10
+                                ? 'peers-average'
+                                : 'peers-poor'
+                            }`}
+                            title={`${stream.seeders} active seeders`}
+                          >
+                            <Users size={12} aria-hidden="true" />
+                            <span>{stream.seeders}</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="stream-card-action">
+                        {isResolving ? (
+                          <div className="stream-spinner-box">
+                            <Loader2 size={16} className="stream-loading-spin" />
+                            <span>Resolving...</span>
+                          </div>
+                        ) : (
+                          <div className="stream-card-btns">
+                            <button
+                              type="button"
+                              className="stream-card-play-btn"
+                              aria-label={`Play stream ${stream.cleanTitle || stream.title}`}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleStreamSelect(stream)
+                              }}
+                            >
+                              <Play size={12} fill="currentColor" />
+                              <span>Play</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              className={`stream-card-download-btn ${isDownloadingThis ? 'loading' : ''}`}
+                              onClick={(e) => handleDownloadStream(e, stream)}
+                              title="Download stream for offline watching"
+                              aria-label={`Download ${stream.cleanTitle || stream.title}`}
+                              disabled={isDownloadingThis}
+                            >
+                              {isDownloadingThis ? (
+                                <Loader2 size={13} className="stream-download-spin" aria-hidden="true" />
+                              ) : (
+                                <Download size={13} aria-hidden="true" />
+                              )}
+                              <span className="stream-download-btn-label">Download</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -441,25 +845,32 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
           )}
         </div>
 
-        {/* Footer */}
-        <div className="stream-picker-footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {/* Modal Footer */}
+        <div className="stream-modal-footer">
           {!torboxConnected && streams.some(s => s.infoHash) && (
-            <p className="text-xs text-muted">
-              Connect your TorBox account in Settings to unlock high-speed torrent streams. Direct streams play for free!
-            </p>
+            <div className="stream-torbox-notice">
+              <Sparkles size={14} className="notice-icon" aria-hidden="true" />
+              <span>
+                Want instant 4K debrid streaming & high-speed downloads? Connect TorBox in Settings to unlock lightning fast cache speeds.
+              </span>
+            </div>
           )}
-          <button 
-            className="btn btn-secondary" 
-            style={{ width: '100%', border: '1px dashed #9c27b0', color: '#e879f9' }}
-            onClick={() => {
-              onClose()
-              navigate('/wasm-player')
-            }}
-          >
-            Got an unsupported local file? Decode it with our WASM Engine
-          </button>
+
+          <div className="stream-footer-actions">
+            <button
+              type="button"
+              className="stream-wasm-btn"
+              onClick={() => {
+                onClose()
+                navigate('/wasm-player')
+              }}
+            >
+              Have a local video or custom file? Launch WASM Hardware Decoder
+            </button>
+          </div>
         </div>
       </div>
     </div>
   )
 }
+

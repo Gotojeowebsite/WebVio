@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Play } from 'lucide-react'
 import { usePlayerStore } from '../store/player-store'
 import { useAuthStore } from '../store/auth-store'
+import { recordEpisodeWatched, recordMovieWatched } from '../api/simkl-sync'
 import { markWatched } from '../api/simkl'
 import { markTraktWatched } from '../api/trakt'
 import VideoPlayer from '../components/player/VideoPlayer'
@@ -83,9 +84,9 @@ export default function Player() {
 
     if (simklConnected && simklAccessToken && simklClientId) {
       if (currentMeta.type === 'movie' && imdbId) {
-        markWatched(simklClientId, simklAccessToken, {
-          movies: [{ ids: { imdb: imdbId }, watched_at: new Date().toISOString() }],
-        }).catch((e) => console.warn('Simkl movie scrobble failed', e))
+        recordMovieWatched(simklClientId, simklAccessToken, imdbId).catch((e) =>
+          console.warn('Simkl movie scrobble failed', e)
+        )
       } else if (currentMeta.type === 'anime' || isKitsu) {
         markWatched(simklClientId, simklAccessToken, {
           anime: [{
@@ -97,15 +98,13 @@ export default function Player() {
           }],
         }).catch((e) => console.warn('Simkl anime scrobble failed', e))
       } else if (currentVideo?.season && currentVideo?.episode && imdbId) {
-        markWatched(simklClientId, simklAccessToken, {
-          shows: [{
-            ids: { imdb: imdbId },
-            seasons: [{
-              number: currentVideo.season,
-              episodes: [{ number: currentVideo.episode, watched_at: new Date().toISOString() }],
-            }],
-          }],
-        }).catch((e) => console.warn('Simkl show scrobble failed', e))
+        recordEpisodeWatched(
+          simklClientId,
+          simklAccessToken,
+          imdbId,
+          currentVideo.season,
+          currentVideo.episode
+        ).catch((e) => console.warn('Simkl show scrobble failed', e))
       }
     }
 
@@ -139,9 +138,9 @@ export default function Player() {
   const handleTimeUpdate = useCallback((time: number) => {
     updateTime(time)
 
-    // Scrobble at 75% watched
+    // Scrobble at 80% watched
     const { duration } = usePlayerStore.getState()
-    if (!scrobbled.current && duration > 0 && time / duration > 0.75) {
+    if (!scrobbled.current && duration > 0 && time / duration >= 0.8) {
       triggerScrobble()
     }
 

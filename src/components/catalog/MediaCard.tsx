@@ -128,7 +128,7 @@ export default function MediaCard({ item }: Props) {
         </p>
         <div className="media-meta">
           {item.year && <span style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>{item.year}</span>}
-          {item.imdbRating && <span style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(245, 197, 24, 0.1)', color: '#f5c518', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>⭐ {item.imdbRating}</span>}
+          {item.imdbRating && <span style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(245, 197, 24, 0.1)', color: '#f5c518', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}><span aria-hidden="true">⭐</span><span>{item.imdbRating}</span></span>}
           {item.type && <span className="badge badge-small" style={{ textTransform: 'capitalize', background: 'rgba(108, 92, 231, 0.2)', color: '#a29bfe', padding: '2px 6px', borderRadius: '4px' }}>{item.type}</span>}
         </div>
       </div>

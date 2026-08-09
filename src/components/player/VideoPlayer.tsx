@@ -1,9 +1,29 @@
 import { useEffect, useRef, useState, useCallback, MouseEvent as ReactMouseEvent } from 'react'
 import Hls from 'hls.js'
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, Subtitles, Music, RotateCcw, RotateCw, ArrowLeft, X, Zap, Globe, AlertCircle } from 'lucide-react'
+import {
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
+  Maximize,
+  Minimize,
+  Subtitles,
+  Music,
+  RotateCcw,
+  RotateCw,
+  ArrowLeft,
+  X,
+  Zap,
+  Globe,
+  AlertCircle,
+  Sliders,
+  Tv,
+  Check,
+} from 'lucide-react'
 import { usePlayerStore, EnrichedStream } from '../../store/player-store'
 import { parseStreamInfo, resolveStreamUrl } from '../../utils/stream-resolver'
 import { useAuthStore } from '../../store/auth-store'
+import { StreamEngine, EngineMetrics, StreamFormat } from '../../engine'
 
 export interface SubtitleTrack {
   id: string
@@ -28,12 +48,17 @@ interface VideoPlayerProps {
   onEnded?: () => void
   startTime?: number
   subtitles?: SubtitleTrack[]
+  useStreamEngine?: boolean
 }
 
 const formatTime = (seconds: number) => {
-  if (isNaN(seconds)) return '0:00'
-  const m = Math.floor(seconds / 60)
+  if (isNaN(seconds) || seconds < 0) return '0:00'
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
   const s = Math.floor(seconds % 60)
+  if (h > 0) {
+    return `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`
+  }
   return `${m}:${s < 10 ? '0' : ''}${s}`
 }
 
@@ -81,26 +106,29 @@ function parseSubtitleText(content: string): ParsedCue[] {
   return cues
 }
 
-export default function VideoPlayer({ 
-  src: initialSrc, 
-  title, 
-  subtitle, 
-  quality, 
-  onBack, 
-  onTimeUpdate, 
-  onDurationChange, 
-  onEnded, 
-  startTime, 
-  subtitles = []
+export default function VideoPlayer({
+  src: initialSrc,
+  title,
+  subtitle,
+  quality: initialQuality,
+  onBack,
+  onTimeUpdate,
+  onDurationChange,
+  onEnded,
+  startTime,
+  subtitles = [],
+  useStreamEngine = true,
 }: VideoPlayerProps) {
   const [activeSrc, setActiveSrc] = useState(initialSrc)
+  const [activeQuality, setActiveQuality] = useState(initialQuality)
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const hlsRef = useRef<Hls | null>(null)
+  const engineRef = useRef<StreamEngine | null>(null)
 
   const { availableStreams, setStream } = usePlayerStore()
   const { torboxApiKey } = useAuthStore()
-  
+
   const [error, setError] = useState('')
   const [isPlaying, setIsPlaying] = useState(true)
   const [currentTime, setCurrentTime] = useState(0)
@@ -109,8 +137,11 @@ export default function VideoPlayer({
   const [isMuted, setIsMuted] = useState(false)
   const [needsUserUnmute, setNeedsUserUnmute] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isPiP, setIsPiP] = useState(false)
   const [showControls, setShowControls] = useState(true)
   const [switchingStream, setSwitchingStream] = useState(false)
+  const [activePipelineBadge, setActivePipelineBadge] = useState<StreamFormat | null>(null)
+  const [_metrics, setMetrics] = useState<EngineMetrics | null>(null)
 
   // Subtitle States
   const [selectedSubId, setSelectedSubId] = useState<string>('off')
@@ -120,20 +151,22 @@ export default function VideoPlayer({
   const [subSize, setSubSize] = useState<'normal' | 'large' | 'xlarge'>('normal')
   const [showSubMenu, setShowSubMenu] = useState(false)
   const [showAudioMenu, setShowAudioMenu] = useState(false)
+  const [showQualityMenu, setShowQualityMenu] = useState(false)
   const [hoverTime, setHoverTime] = useState<number | null>(null)
   const [hoverPos, setHoverPos] = useState<number>(0)
 
-  // Audio Tracks (HLS)
-  const [audioTracks, setAudioTracks] = useState<{ id: number; name: string; lang: string }[]>([])
-  const [selectedAudioTrack, setSelectedAudioTrack] = useState<number>(0)
+  // Audio Tracks
+  const [audioTracks, setAudioTracks] = useState<{ id: number | string; name: string; lang: string }[]>([])
+  const [selectedAudioTrack, setSelectedAudioTrack] = useState<number | string>(0)
 
   const controlsTimeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
     setActiveSrc(initialSrc)
-  }, [initialSrc])
+    setActiveQuality(initialQuality)
+  }, [initialSrc, initialQuality])
 
-  // Direct HTML5 Audio Synchronization
+  // Audio Sync
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
@@ -141,98 +174,176 @@ export default function VideoPlayer({
     video.muted = isMuted
   }, [volume, isMuted])
 
-
-  // Initialize Video & Robust Stream Pipeline
+  // Initialize Video & Stream Engine
   useEffect(() => {
     const video = videoRef.current
     if (!video || !activeSrc) return
 
-    if (hlsRef.current) {
-      hlsRef.current.destroy()
-      hlsRef.current = null
-    }
-
-    const onMetadataLoaded = () => {
-      if (startTime && startTime > 0) {
-        video.currentTime = startTime
+    if (useStreamEngine) {
+      if (engineRef.current) {
+        engineRef.current.destroy()
+        engineRef.current = null
       }
 
-      const playPromise = video.play()
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            setIsPlaying(true)
-            setNeedsUserUnmute(false)
-          })
-          .catch((err) => {
-            if (err.name === 'NotAllowedError') {
-              video.muted = true
-              setIsMuted(true)
-              video.play().then(() => {
-                setIsPlaying(true)
-                setNeedsUserUnmute(true)
-              }).catch(() => setIsPlaying(false))
-            } else {
-              setIsPlaying(false)
-            }
-          })
-      }
-    }
-
-    if (activeSrc.includes('.m3u8') && Hls.isSupported()) {
-      const hls = new Hls({
+      const engine = new StreamEngine({
+        turboMode: true,
+        autoFallback: true,
         maxBufferLength: 30,
-        maxMaxBufferLength: 60,
-        enableWorker: true,
-        backBufferLength: 30,
-        fragLoadingTimeOut: 20000,
-        manifestLoadingTimeOut: 20000,
       })
-      hlsRef.current = hls
-      hls.loadSource(activeSrc)
-      hls.attachMedia(video)
+      engineRef.current = engine
+      engine.attach(video)
 
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        onMetadataLoaded()
-        if (hls.audioTracks && hls.audioTracks.length > 0) {
-          setAudioTracks(
-            hls.audioTracks.map((t, idx) => ({
-              id: idx,
-              name: t.name || `Track ${idx + 1}`,
-              lang: t.lang || 'und',
-            }))
-          )
+      const unsubAudio = engine.on('audioTracksChanged', (tracks, curTrack) => {
+        setAudioTracks(tracks)
+        setSelectedAudioTrack(curTrack)
+      })
+
+      const unsubPipeline = engine.on('pipelineChanged', (pipe) => {
+        setActivePipelineBadge(pipe)
+      })
+
+      const unsubMetrics = engine.on('metricsUpdate', (m) => {
+        setMetrics(m)
+      })
+
+      const unsubError = engine.on('error', (err) => {
+        if (err.fatal) {
+          setError(`Playback error: ${err.message}`)
         }
       })
 
-      hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_event, data) => {
-        setSelectedAudioTrack(data.id)
-      })
+      engine
+        .load({
+          url: activeSrc,
+          initialTime: startTime,
+        })
+        .then(() => {
+          video
+            .play()
+            .then(() => {
+              setIsPlaying(true)
+              setNeedsUserUnmute(false)
+            })
+            .catch((err) => {
+              if (err.name === 'NotAllowedError') {
+                video.muted = true
+                setIsMuted(true)
+                video
+                  .play()
+                  .then(() => {
+                    setIsPlaying(true)
+                    setNeedsUserUnmute(true)
+                  })
+                  .catch(() => setIsPlaying(false))
+              } else {
+                setIsPlaying(false)
+              }
+            })
+        })
+        .catch((err) => {
+          console.error('[VideoPlayer] StreamEngine load error:', err)
+          setError('Failed to initialize stream decoder.')
+        })
 
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) {
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            hls.startLoad()
-          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-            hls.recoverMediaError()
-          } else {
-            setError(`Playback issue: ${data.details}`)
-          }
-        }
-      })
+      return () => {
+        unsubAudio()
+        unsubPipeline()
+        unsubMetrics()
+        unsubError()
+        engine.destroy()
+        engineRef.current = null
+      }
     } else {
-      video.src = activeSrc
-      video.addEventListener('loadedmetadata', onMetadataLoaded)
-    }
-
-    return () => {
-      video.removeEventListener('loadedmetadata', onMetadataLoaded)
       if (hlsRef.current) {
         hlsRef.current.destroy()
         hlsRef.current = null
       }
+
+      const onMetadataLoaded = () => {
+        if (startTime && startTime > 0) {
+          video.currentTime = startTime
+        }
+
+        const playPromise = video.play()
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              setIsPlaying(true)
+              setNeedsUserUnmute(false)
+            })
+            .catch((err) => {
+              if (err.name === 'NotAllowedError') {
+                video.muted = true
+                setIsMuted(true)
+                video
+                  .play()
+                  .then(() => {
+                    setIsPlaying(true)
+                    setNeedsUserUnmute(true)
+                  })
+                  .catch(() => setIsPlaying(false))
+              } else {
+                setIsPlaying(false)
+              }
+            })
+        }
+      }
+
+      if (activeSrc.includes('.m3u8') && Hls.isSupported()) {
+        const hls = new Hls({
+          maxBufferLength: 30,
+          maxMaxBufferLength: 60,
+          enableWorker: true,
+          backBufferLength: 30,
+          fragLoadingTimeOut: 20000,
+          manifestLoadingTimeOut: 20000,
+        })
+        hlsRef.current = hls
+        hls.loadSource(activeSrc)
+        hls.attachMedia(video)
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          onMetadataLoaded()
+          if (hls.audioTracks && hls.audioTracks.length > 0) {
+            setAudioTracks(
+              hls.audioTracks.map((t, idx) => ({
+                id: idx,
+                name: t.name || `Track ${idx + 1}`,
+                lang: t.lang || 'und',
+              }))
+            )
+          }
+        })
+
+        hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_event, data) => {
+          setSelectedAudioTrack(data.id)
+        })
+
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (data.fatal) {
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+              hls.startLoad()
+            } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+              hls.recoverMediaError()
+            } else {
+              setError(`Playback issue: ${data.details}`)
+            }
+          }
+        })
+      } else {
+        video.src = activeSrc
+        video.addEventListener('loadedmetadata', onMetadataLoaded)
+      }
+
+      return () => {
+        video.removeEventListener('loadedmetadata', onMetadataLoaded)
+        if (hlsRef.current) {
+          hlsRef.current.destroy()
+          hlsRef.current = null
+        }
+      }
     }
-  }, [activeSrc, startTime])
+  }, [activeSrc, startTime, useStreamEngine])
 
   // Subtitle Loader
   useEffect(() => {
@@ -242,18 +353,18 @@ export default function VideoPlayer({
       return
     }
 
-    const sub = subtitles.find(s => s.id === selectedSubId || s.lang === selectedSubId)
+    const sub = subtitles.find((s) => s.id === selectedSubId || s.lang === selectedSubId)
     if (!sub || !sub.url) return
 
     let cancelled = false
     fetch(sub.url)
-      .then(res => res.text())
-      .then(content => {
+      .then((res) => res.text())
+      .then((content) => {
         if (cancelled) return
         const parsed = parseSubtitleText(content)
         setActiveCues(parsed)
       })
-      .catch(err => {
+      .catch((err) => {
         console.warn('Failed to load subtitle file:', err)
         setActiveCues([])
       })
@@ -266,7 +377,9 @@ export default function VideoPlayer({
   // Auto-select English subtitles if available on start
   useEffect(() => {
     if (subtitles.length > 0 && selectedSubId === 'off') {
-      const engSub = subtitles.find(s => s.lang.toLowerCase().startsWith('en') || s.lang.toLowerCase() === 'eng')
+      const engSub = subtitles.find(
+        (s) => s.lang.toLowerCase().startsWith('en') || s.lang.toLowerCase() === 'eng'
+      )
       if (engSub) {
         setSelectedSubId(engSub.id || engSub.lang)
       }
@@ -281,9 +394,10 @@ export default function VideoPlayer({
     }
 
     const adjustedTime = currentTime + subOffset
-    const match = activeCues.find(cue => adjustedTime >= cue.start && adjustedTime <= cue.end)
+    const match = activeCues.find((cue) => adjustedTime >= cue.start && adjustedTime <= cue.end)
     setCurrentSubtitleText(match ? match.text : '')
   }, [currentTime, activeCues, subOffset])
+
   // Hide controls on idle (3s)
   const handleMouseMove = useCallback(() => {
     setShowControls(true)
@@ -292,6 +406,7 @@ export default function VideoPlayer({
       setShowControls(false)
       setShowSubMenu(false)
       setShowAudioMenu(false)
+      setShowQualityMenu(false)
     }, 3000)
   }, [])
 
@@ -309,6 +424,23 @@ export default function VideoPlayer({
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
   }, [])
 
+  // Picture-in-Picture event listener
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    const handleEnterPiP = () => setIsPiP(true)
+    const handleLeavePiP = () => setIsPiP(false)
+
+    video.addEventListener('enterpictureinpicture', handleEnterPiP)
+    video.addEventListener('leavepictureinpicture', handleLeavePiP)
+
+    return () => {
+      video.removeEventListener('enterpictureinpicture', handleEnterPiP)
+      video.removeEventListener('leavepictureinpicture', handleLeavePiP)
+    }
+  }, [])
+
   // Video Events
   const handleTimeUpdate = useCallback(() => {
     if (videoRef.current) {
@@ -324,10 +456,11 @@ export default function VideoPlayer({
     }
   }, [onDurationChange])
 
-  // Switch to an alternate transcode stream if current stream is unavailable
+  // Switch to an alternate transcode stream / quality
   const handleSwitchToStream = async (alternateStream: EnrichedStream) => {
     setSwitchingStream(true)
     setError('')
+    setShowQualityMenu(false)
     try {
       const url = await resolveStreamUrl(alternateStream, torboxApiKey || undefined)
       if (url) {
@@ -339,6 +472,7 @@ export default function VideoPlayer({
           source: alternateStream.addonName,
         })
         setActiveSrc(url)
+        setActiveQuality(info.quality || undefined)
       } else {
         setError('Could not resolve alternate stream.')
       }
@@ -348,7 +482,6 @@ export default function VideoPlayer({
       setSwitchingStream(false)
     }
   }
-
 
   const togglePlay = useCallback(() => {
     if (videoRef.current) {
@@ -383,9 +516,34 @@ export default function VideoPlayer({
   const toggleFullscreen = useCallback(async () => {
     if (!containerRef.current) return
     if (!document.fullscreenElement) {
-      await containerRef.current.requestFullscreen().catch(err => console.error(err))
+      await containerRef.current.requestFullscreen().catch((err) => console.error(err))
     } else {
-      await document.exitFullscreen().catch(err => console.error(err))
+      await document.exitFullscreen().catch((err) => console.error(err))
+    }
+  }, [])
+
+  const togglePiP = useCallback(async () => {
+    const video = videoRef.current
+    if (!video) return
+
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture()
+        setIsPiP(false)
+      } else if (document.pictureInPictureEnabled) {
+        await video.requestPictureInPicture()
+        setIsPiP(true)
+      }
+    } catch (err) {
+      console.warn('[VideoPlayer] Picture-in-Picture toggle failed:', err)
+    }
+  }, [])
+
+  const skipSeconds = useCallback((sec: number) => {
+    if (videoRef.current) {
+      const cur = videoRef.current.currentTime
+      const dur = videoRef.current.duration || 0
+      videoRef.current.currentTime = Math.max(0, Math.min(dur, cur + sec))
     }
   }, [])
 
@@ -400,12 +558,12 @@ export default function VideoPlayer({
       if (e.key === ' ' || e.key === 'k') {
         e.preventDefault()
         togglePlay()
-      } else if (e.key === 'ArrowRight') {
+      } else if (e.key === 'ArrowRight' || e.key === 'l') {
         e.preventDefault()
-        video.currentTime = Math.min(video.duration || 0, video.currentTime + 10)
-      } else if (e.key === 'ArrowLeft') {
+        skipSeconds(10)
+      } else if (e.key === 'ArrowLeft' || e.key === 'j') {
         e.preventDefault()
-        video.currentTime = Math.max(0, video.currentTime - 10)
+        skipSeconds(-10)
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
         const newVol = Math.min(1, volume + 0.1)
@@ -426,15 +584,27 @@ export default function VideoPlayer({
       } else if (e.key === 'm' || e.key === 'M') {
         e.preventDefault()
         toggleMute()
+      } else if (e.key === 'p' || e.key === 'P') {
+        e.preventDefault()
+        togglePiP()
       } else if (e.key === 'c' || e.key === 'C') {
         e.preventDefault()
-        setSelectedSubId(prev => (prev === 'off' && subtitles.length ? subtitles[0].id || subtitles[0].lang : 'off'))
+        setSelectedSubId((prev) =>
+          prev === 'off' && subtitles.length ? subtitles[0].id || subtitles[0].lang : 'off'
+        )
+      } else if (e.key >= '0' && e.key <= '9') {
+        // Jump to 0% - 90%
+        e.preventDefault()
+        const percent = parseInt(e.key, 10) / 10
+        if (video.duration) {
+          video.currentTime = video.duration * percent
+        }
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [subtitles, volume, togglePlay, toggleMute, toggleFullscreen])
+  }, [subtitles, volume, togglePlay, toggleMute, toggleFullscreen, togglePiP, skipSeconds])
 
   const handleSeek = (e: ReactMouseEvent<HTMLDivElement>) => {
     if (!videoRef.current) return
@@ -463,35 +633,33 @@ export default function VideoPlayer({
     }
   }
 
-  const handleAudioTrackSelect = (trackId: number) => {
-    if (hlsRef.current) {
-      hlsRef.current.audioTrack = trackId
+  const handleAudioTrackSelect = (trackId: number | string) => {
+    if (useStreamEngine && engineRef.current) {
+      engineRef.current.setAudioTrack(trackId)
       setSelectedAudioTrack(trackId)
-    }
-  }
-
-  const skipSeconds = (sec: number) => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = Math.max(0, Math.min(duration || 0, videoRef.current.currentTime + sec))
+    } else if (hlsRef.current) {
+      const id = typeof trackId === 'string' ? parseInt(trackId, 10) : trackId
+      hlsRef.current.audioTrack = id
+      setSelectedAudioTrack(id)
     }
   }
 
   return (
-    <div 
-      className="video-container" 
+    <div
+      className="video-container"
       ref={containerRef}
       onMouseMove={handleMouseMove}
       onClick={() => setShowControls(true)}
       onTouchStart={(e) => {
         if (!(e.target as HTMLElement).closest('button, .video-progress-container, .volume-slider, .player-popover')) {
-          setShowControls(prev => !prev)
+          setShowControls((prev) => !prev)
           handleMouseMove()
         }
       }}
       onDoubleClick={toggleFullscreen}
       onMouseLeave={() => isPlaying && setShowControls(false)}
     >
-      {/* Unmute Floating Banner if autoplay was muted by browser policy */}
+      {/* Unmute Floating Banner */}
       {needsUserUnmute && (
         <button
           type="button"
@@ -506,17 +674,30 @@ export default function VideoPlayer({
 
       {error && (
         <div className="video-error">
-          <p style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+          <p
+            style={{
+              margin: '0 0 12px 0',
+              fontSize: '1rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+            }}
+          >
             <AlertCircle size={20} color="#f59e0b" aria-hidden="true" /> {error}
           </p>
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button className="btn btn-primary" onClick={() => {
-              setError('')
-              if (videoRef.current) {
-                videoRef.current.load()
-                videoRef.current.play().catch(() => setIsPlaying(false))
-              }
-            }}>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setError('')
+                if (videoRef.current) {
+                  videoRef.current.load()
+                  videoRef.current.play().catch(() => setIsPlaying(false))
+                }
+              }}
+            >
               Retry Stream
             </button>
             {availableStreams.length > 1 && (
@@ -524,7 +705,8 @@ export default function VideoPlayer({
                 className="btn btn-secondary"
                 disabled={switchingStream}
                 onClick={() => {
-                  const alt = availableStreams.find(s => s.url !== activeSrc && s.infoHash) || availableStreams[1]
+                  const alt =
+                    availableStreams.find((s) => s.url !== activeSrc && s.infoHash) || availableStreams[1]
                   if (alt) handleSwitchToStream(alt)
                 }}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
@@ -553,7 +735,7 @@ export default function VideoPlayer({
         autoPlay
       />
 
-      {/* High-Precision Outlined Subtitle Overlay */}
+      {/* Subtitle Overlay Rendering */}
       {currentSubtitleText && (
         <div className={`subtitle-overlay-container ${subSize}`}>
           <div className="subtitle-text-box">
@@ -566,7 +748,7 @@ export default function VideoPlayer({
         </div>
       )}
 
-      {/* Custom Player Overlay */}
+      {/* Custom Desktop TV HUD Overlay */}
       <div className={`video-overlay ${showControls || !isPlaying ? 'show-controls' : ''}`}>
         <div className="video-top-gradient" />
         <div className="video-bottom-gradient" />
@@ -580,7 +762,27 @@ export default function VideoPlayer({
           <div className="player-title-info">
             <h1 className="player-title-main">
               {title || 'Playing'}
-              {quality && <span className="player-badge-hd">{quality}</span>}
+              {activeQuality && <span className="player-badge-hd">{activeQuality}</span>}
+              {activePipelineBadge && (
+                <span
+                  className="player-badge-turbo"
+                  style={{
+                    background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                    color: '#fff',
+                    fontSize: '0.7rem',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    textTransform: 'uppercase',
+                    fontWeight: 700,
+                    marginLeft: '6px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                  }}
+                >
+                  {activePipelineBadge === 'native' ? '⚡ TURBO' : activePipelineBadge.toUpperCase()}
+                </span>
+              )}
               {selectedSubId !== 'off' && <span className="player-badge-sub">CC</span>}
             </h1>
             {subtitle && <p className="player-title-sub">{subtitle}</p>}
@@ -589,12 +791,16 @@ export default function VideoPlayer({
 
         {/* Subtitles Menu Popover */}
         {showSubMenu && (
-          <div className="player-popover sub-popover" onClick={e => e.stopPropagation()}>
+          <div className="player-popover sub-popover" onClick={(e) => e.stopPropagation()}>
             <div className="popover-header">
               <h4 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Subtitles size={18} aria-hidden="true" /> Subtitles
               </h4>
-              <button className="popover-close" onClick={() => setShowSubMenu(false)} aria-label="Close subtitle menu">
+              <button
+                className="popover-close"
+                onClick={() => setShowSubMenu(false)}
+                aria-label="Close subtitle menu"
+              >
                 <X size={18} aria-hidden="true" />
               </button>
             </div>
@@ -608,7 +814,7 @@ export default function VideoPlayer({
                 >
                   Off
                 </button>
-                {subtitles.map(sub => (
+                {subtitles.map((sub) => (
                   <button
                     key={sub.id || sub.lang}
                     className={`popover-item ${selectedSubId === (sub.id || sub.lang) ? 'active' : ''}`}
@@ -622,20 +828,37 @@ export default function VideoPlayer({
             </div>
 
             <div className="popover-section">
-              <label>Sync Offset: {subOffset >= 0 ? `+${subOffset.toFixed(1)}s` : `${subOffset.toFixed(1)}s`}</label>
+              <label>
+                Sync Offset: {subOffset >= 0 ? `+${subOffset.toFixed(1)}s` : `${subOffset.toFixed(1)}s`}
+              </label>
               <div className="offset-buttons">
-                <button onClick={() => setSubOffset(o => parseFloat((o - 0.5).toFixed(1)))}>-0.5s</button>
+                <button onClick={() => setSubOffset((o) => parseFloat((o - 0.5).toFixed(1)))}>-0.5s</button>
                 <button onClick={() => setSubOffset(0)}>Reset</button>
-                <button onClick={() => setSubOffset(o => parseFloat((o + 0.5).toFixed(1)))}>+0.5s</button>
+                <button onClick={() => setSubOffset((o) => parseFloat((o + 0.5).toFixed(1)))}>+0.5s</button>
               </div>
             </div>
 
             <div className="popover-section">
               <label>Font Size</label>
               <div className="size-buttons">
-                <button className={subSize === 'normal' ? 'active' : ''} onClick={() => setSubSize('normal')}>Normal</button>
-                <button className={subSize === 'large' ? 'active' : ''} onClick={() => setSubSize('large')}>Large</button>
-                <button className={subSize === 'xlarge' ? 'active' : ''} onClick={() => setSubSize('xlarge')}>XL</button>
+                <button
+                  className={subSize === 'normal' ? 'active' : ''}
+                  onClick={() => setSubSize('normal')}
+                >
+                  Normal
+                </button>
+                <button
+                  className={subSize === 'large' ? 'active' : ''}
+                  onClick={() => setSubSize('large')}
+                >
+                  Large
+                </button>
+                <button
+                  className={subSize === 'xlarge' ? 'active' : ''}
+                  onClick={() => setSubSize('xlarge')}
+                >
+                  XL
+                </button>
               </div>
             </div>
           </div>
@@ -643,12 +866,16 @@ export default function VideoPlayer({
 
         {/* Audio Tracks Popover */}
         {showAudioMenu && (
-          <div className="player-popover audio-popover" onClick={e => e.stopPropagation()}>
+          <div className="player-popover audio-popover" onClick={(e) => e.stopPropagation()}>
             <div className="popover-header">
               <h4 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Music size={18} aria-hidden="true" /> Audio Tracks
               </h4>
-              <button className="popover-close" onClick={() => setShowAudioMenu(false)} aria-label="Close audio menu">
+              <button
+                className="popover-close"
+                onClick={() => setShowAudioMenu(false)}
+                aria-label="Close audio menu"
+              >
                 <X size={18} aria-hidden="true" />
               </button>
             </div>
@@ -657,7 +884,7 @@ export default function VideoPlayer({
               <div className="popover-section">
                 <label>Audio Tracks ({audioTracks.length})</label>
                 <div className="popover-list">
-                  {audioTracks.map(t => (
+                  {audioTracks.map((t) => (
                     <button
                       key={t.id}
                       className={`popover-item ${selectedAudioTrack === t.id ? 'active' : ''}`}
@@ -679,9 +906,63 @@ export default function VideoPlayer({
           </div>
         )}
 
+        {/* Stream Quality Popover */}
+        {showQualityMenu && (
+          <div className="player-popover quality-popover" onClick={(e) => e.stopPropagation()}>
+            <div className="popover-header">
+              <h4 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Sliders size={18} aria-hidden="true" /> Stream Quality
+              </h4>
+              <button
+                className="popover-close"
+                onClick={() => setShowQualityMenu(false)}
+                aria-label="Close quality menu"
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="popover-section">
+              <label>Available Streams ({availableStreams.length || 1})</label>
+              <div className="popover-list" style={{ maxHeight: '220px' }}>
+                {availableStreams.length > 0 ? (
+                  availableStreams.map((stream, idx) => {
+                    const isCurrent = stream.url === activeSrc
+                    const parsed = parseStreamInfo(stream)
+                    return (
+                      <button
+                        key={stream.infoHash || stream.url || idx}
+                        className={`popover-item ${isCurrent ? 'active' : ''}`}
+                        onClick={() => handleSwitchToStream(stream)}
+                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <span style={{ fontWeight: 600, color: '#fff' }}>
+                            {parsed.quality || 'Auto'} • {stream.addonName || 'Provider'}
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                            {parsed.size || (parsed.codec ? `${parsed.codec}` : 'Direct')}
+                            {stream.isCached ? ' • ⚡ Instant Debrid' : ''}
+                          </span>
+                        </div>
+                        {isCurrent && <Check size={16} color="#c084fc" aria-hidden="true" />}
+                      </button>
+                    )
+                  })
+                ) : (
+                  <div className="popover-item active">
+                    <span style={{ fontWeight: 600 }}>{activeQuality || 'Standard HD'}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom TV Controls HUD */}
         <div className="video-bottom-controls">
-          <div 
-            className="video-progress-container" 
+          <div
+            className="video-progress-container"
             onClick={handleSeek}
             onMouseMove={(e) => {
               const rect = e.currentTarget.getBoundingClientRect()
@@ -691,11 +972,11 @@ export default function VideoPlayer({
               setHoverTime(clampedPos * (duration || 0))
             }}
             onMouseLeave={() => setHoverTime(null)}
-            role="slider" 
+            role="slider"
             tabIndex={0}
-            aria-label="Video timeline" 
-            aria-valuenow={currentTime} 
-            aria-valuemin={0} 
+            aria-label="Video timeline"
+            aria-valuenow={currentTime}
+            aria-valuemin={0}
             aria-valuemax={duration || 0}
             onKeyDown={(e) => {
               if (e.key === 'ArrowRight') {
@@ -712,7 +993,10 @@ export default function VideoPlayer({
                 {formatTime(hoverTime)}
               </div>
             )}
-            <div className="video-progress-bar" style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}>
+            <div
+              className="video-progress-bar"
+              style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
+            >
               <div className="video-progress-thumb" />
             </div>
           </div>
@@ -725,14 +1009,18 @@ export default function VideoPlayer({
                 aria-label={isPlaying ? 'Pause' : 'Play'}
                 title="Play/Pause (Space)"
               >
-                {isPlaying ? <Pause size={24} aria-hidden="true" /> : <Play size={24} fill="currentColor" aria-hidden="true" />}
+                {isPlaying ? (
+                  <Pause size={24} aria-hidden="true" />
+                ) : (
+                  <Play size={24} fill="currentColor" aria-hidden="true" />
+                )}
               </button>
 
               <button
                 className="control-btn skip-btn"
                 onClick={() => skipSeconds(-10)}
                 aria-label="Rewind 10 seconds"
-                title="Rewind 10s (←)"
+                title="Rewind 10s (← / J)"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
               >
                 <RotateCcw size={16} aria-hidden="true" /> 10s
@@ -742,12 +1030,12 @@ export default function VideoPlayer({
                 className="control-btn skip-btn"
                 onClick={() => skipSeconds(10)}
                 aria-label="Forward 10 seconds"
-                title="Forward 10s (→)"
+                title="Forward 10s (→ / L)"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
               >
                 <RotateCw size={16} aria-hidden="true" /> 10s
               </button>
-              
+
               <div className="volume-container">
                 <button
                   className="control-btn"
@@ -755,10 +1043,25 @@ export default function VideoPlayer({
                   aria-label={isMuted || volume === 0 ? 'Unmute' : 'Mute'}
                   title="Mute/Unmute (M)"
                 >
-                  {isMuted || volume === 0 ? <VolumeX size={20} aria-hidden="true" /> : <Volume2 size={20} aria-hidden="true" />}
+                  {isMuted || volume === 0 ? (
+                    <VolumeX size={20} aria-hidden="true" />
+                  ) : (
+                    <Volume2 size={20} aria-hidden="true" />
+                  )}
                 </button>
-                <div className="volume-slider" onClick={handleVolume} role="slider" aria-label="Volume slider" aria-valuenow={isMuted ? 0 : volume * 100} aria-valuemin={0} aria-valuemax={100}>
-                  <div className="volume-level" style={{ width: `${isMuted ? 0 : volume * 100}%` }} />
+                <div
+                  className="volume-slider"
+                  onClick={handleVolume}
+                  role="slider"
+                  aria-label="Volume slider"
+                  aria-valuenow={isMuted ? 0 : volume * 100}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <div
+                    className="volume-level"
+                    style={{ width: `${isMuted ? 0 : volume * 100}%` }}
+                  />
                 </div>
               </div>
 
@@ -768,6 +1071,22 @@ export default function VideoPlayer({
             </div>
 
             <div className="video-right-actions">
+              {/* Quality Selector Button */}
+              <button
+                className={`control-btn popover-trigger ${showQualityMenu ? 'active-neon' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowQualityMenu(!showQualityMenu)
+                  setShowSubMenu(false)
+                  setShowAudioMenu(false)
+                }}
+                aria-label="Quality settings"
+                title="Stream Quality"
+              >
+                <Sliders size={18} aria-hidden="true" />
+                <span className="btn-label">{activeQuality || 'Quality'}</span>
+              </button>
+
               {/* Subtitles Button */}
               <button
                 className={`control-btn popover-trigger ${selectedSubId !== 'off' ? 'active-neon' : ''}`}
@@ -775,30 +1094,42 @@ export default function VideoPlayer({
                   e.stopPropagation()
                   setShowSubMenu(!showSubMenu)
                   setShowAudioMenu(false)
+                  setShowQualityMenu(false)
                 }}
                 aria-label="Subtitles menu"
                 title="Subtitles (C)"
               >
-                <Subtitles size={20} aria-hidden="true" />
+                <Subtitles size={18} aria-hidden="true" />
                 <span className="btn-label">Subtitles</span>
               </button>
 
               {/* Audio Button */}
               {audioTracks.length > 1 && (
                 <button
-                  className="control-btn popover-trigger"
+                  className={`control-btn popover-trigger ${showAudioMenu ? 'active-neon' : ''}`}
                   onClick={(e) => {
                     e.stopPropagation()
                     setShowAudioMenu(!showAudioMenu)
                     setShowSubMenu(false)
+                    setShowQualityMenu(false)
                   }}
                   aria-label="Audio tracks menu"
                   title="Audio Tracks"
                 >
-                  <Music size={20} aria-hidden="true" />
+                  <Music size={18} aria-hidden="true" />
                   <span className="btn-label">Audio</span>
                 </button>
               )}
+
+              {/* Picture-in-Picture Button */}
+              <button
+                className={`control-btn ${isPiP ? 'active-neon' : ''}`}
+                onClick={togglePiP}
+                aria-label={isPiP ? 'Exit Picture-in-Picture' : 'Picture-in-Picture'}
+                title="Picture-in-Picture (P)"
+              >
+                <Tv size={18} aria-hidden="true" />
+              </button>
 
               {/* Fullscreen Button */}
               <button

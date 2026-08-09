@@ -1,7 +1,27 @@
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useFocusable } from '@noriginmedia/norigin-spatial-navigation'
-import { Search, X, Zap, Film, Settings, Library, LogOut, Package, BarChart2 } from 'lucide-react'
+import {
+  Search,
+  X,
+  Zap,
+  Film,
+  Settings,
+  Library,
+  LogOut,
+  Package,
+  BarChart2,
+  Bell,
+  CheckCircle2,
+  AlertCircle,
+  Download,
+  Compass,
+  ChevronRight,
+  Home,
+  RefreshCw,
+  Sparkles,
+  Menu,
+} from 'lucide-react'
 import { useAuthStore } from '../../store/auth-store'
 import { AddonClient, MetaPreview } from '../../api/addon-client'
 import { calculateRelevanceScore } from '../../utils/searchUtils'
@@ -9,20 +29,69 @@ import { calculateRelevanceScore } from '../../utils/searchUtils'
 const CINEMETA_URL = 'https://v3-cinemeta.strem.io/manifest.json'
 const ANIME_KITSU_URL = 'https://anime-kitsu.strem.fun/manifest.json'
 
-export default function Navbar() {
+interface NotificationItem {
+  id: string
+  title: string
+  message: string
+  time: string
+  type: 'info' | 'success' | 'warning'
+  read: boolean
+}
+
+interface NavbarProps {
+  onToggleSidebar?: () => void
+  sidebarCollapsed?: boolean
+}
+
+export default function Navbar({ onToggleSidebar, sidebarCollapsed: _sidebarCollapsed }: NavbarProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [scrolled, setScrolled] = useState(false)
-  const [showDropdown, setShowDropdown] = useState(false)
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
   const [liveSuggestions, setLiveSuggestions] = useState<MetaPreview[]>([])
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
-  const searchBoxRef = useRef<HTMLFormElement>(null)
+  const [notifications, setNotifications] = useState<NotificationItem[]>([
+    {
+      id: '1',
+      title: 'Windows Nuvio Overhaul',
+      message: 'Fluent Windows layout and high-contrast design system active.',
+      time: 'Just now',
+      type: 'info',
+      read: false,
+    },
+    {
+      id: '2',
+      title: 'Simkl Cloud Sync',
+      message: 'Automatic watch progress sync initialized.',
+      time: '5m ago',
+      type: 'success',
+      read: false,
+    },
+  ])
+
+  const profileDropdownRef = useRef<HTMLDivElement>(null)
+  const notificationDropdownRef = useRef<HTMLDivElement>(null)
+  const searchBoxRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
 
+  const {
+    torboxConnected,
+    simklConnected,
+    isSyncingSimkl,
+    simklUser,
+    nuvioEmail,
+    clearNuvioAuth,
+    clearSimklAuth,
+    clearTorboxAuth,
+    syncSimklHistory,
+  } = useAuthStore()
+
   const { ref: brandRef, focused: brandFocused } = useFocusable({
-    onEnterPress: () => navigate('/')
+    onEnterPress: () => navigate('/'),
   })
 
   const { ref: searchRef, focused: searchFocused } = useFocusable({
@@ -31,29 +100,53 @@ export default function Navbar() {
         setShowSearchSuggestions(false)
         navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
       }
-    }
+    },
   })
-  const { torboxConnected, simklConnected } = useAuthStore()
 
+  // Detect scroll for mica background intensity
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 50)
-    window.addEventListener('scroll', handleScroll)
+    const handleScroll = () => setScrolled(window.scrollY > 20)
+    window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
+  // Close dropdowns on outside click or Escape key
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowDropdown(false)
+      const target = event.target as Node
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(target)) {
+        setShowProfileDropdown(false)
       }
-      if (searchBoxRef.current && !searchBoxRef.current.contains(event.target as Node)) {
+      if (notificationDropdownRef.current && !notificationDropdownRef.current.contains(target)) {
+        setShowNotifications(false)
+      }
+      if (searchBoxRef.current && !searchBoxRef.current.contains(target)) {
         setShowSearchSuggestions(false)
       }
     }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowProfileDropdown(false)
+        setShowNotifications(false)
+        setShowSearchSuggestions(false)
+      }
+      // Global shortcut: Ctrl+K or Cmd+K to focus search
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        searchInputRef.current?.focus()
+      }
+    }
+
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
   }, [])
 
+  // Sync searchQuery with URL on search page
   useEffect(() => {
     if (location.pathname === '/search') {
       const q = searchParams.get('q') || ''
@@ -63,7 +156,7 @@ export default function Navbar() {
     }
   }, [location.pathname, searchParams])
 
-  // Fast live query suggestions for the navbar dropdown (150ms debounce)
+  // Fast live query suggestions for the navbar search (150ms debounce)
   useEffect(() => {
     const trimmed = searchQuery.trim()
     if (!trimmed || location.pathname === '/search') {
@@ -89,23 +182,23 @@ export default function Navbar() {
         if (aRes.status === 'fulfilled' && aRes.value?.metas) combined.push(...aRes.value.metas)
 
         const scored = combined
-          .map(item => ({ item, score: calculateRelevanceScore(item, trimmed) }))
-          .filter(s => s.score > 0)
+          .map((item) => ({ item, score: calculateRelevanceScore(item, trimmed) }))
+          .filter((s) => s.score > 0)
           .sort((a, b) => b.score - a.score)
           .slice(0, 6)
-          .map(s => s.item)
+          .map((s) => s.item)
 
         setLiveSuggestions(scored)
         setShowSearchSuggestions(scored.length > 0)
       } catch {
-        // Ignore live fetch error
+        // Ignore live search error
       }
     }, 150)
 
     return () => clearTimeout(timer)
   }, [searchQuery, location.pathname])
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setShowSearchSuggestions(false)
     if (searchQuery.trim()) {
@@ -121,285 +214,417 @@ export default function Navbar() {
     navigate(`/detail/${item.type || 'movie'}/${encodeURIComponent(item.id)}`)
   }
 
-  return (
-    <nav 
-      className={`navbar ${scrolled ? 'scrolled' : ''}`}
-      style={{
-        position: 'fixed',
-        top: 0,
-        width: '100%',
-        zIndex: 1000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '16px 40px',
-        background: scrolled ? 'rgba(10, 10, 15, 0.75)' : 'transparent',
-        backdropFilter: scrolled ? 'blur(40px) saturate(150%)' : 'none',
-        WebkitBackdropFilter: scrolled ? 'blur(40px) saturate(150%)' : 'none',
-        borderBottom: scrolled ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid transparent',
-        transition: 'all 0.4s ease-in-out'
-      }}
-    >
-      <a 
-        href="/" 
-        ref={brandRef}
-        className={`navbar-brand ${brandFocused ? 'focused' : ''}`} 
-        onClick={(e) => { e.preventDefault(); navigate('/') }}
-        style={{
-          fontSize: '1.75rem',
-          fontWeight: 800,
-          color: '#fff',
-          textDecoration: 'none',
-          letterSpacing: '-0.5px',
-          background: 'linear-gradient(90deg, #fff, #a5a5a5)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          transition: 'transform 0.2s ease'
-        }}
-      >
-        Nuvio
-      </a>
+  const handleLogout = () => {
+    setShowProfileDropdown(false)
+    clearNuvioAuth()
+    clearSimklAuth()
+    clearTorboxAuth()
+    navigate('/login')
+  }
 
-      <div style={{ position: 'relative' }}>
-        <form 
-          className={`navbar-search ${searchFocused ? 'focused' : ''}`} 
-          onSubmit={handleSearch} 
-          ref={(node) => {
-            if (searchBoxRef) (searchBoxRef as any).current = node;
-            if (searchRef) (searchRef as any).current = node;
-          }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '30px',
-            padding: '6px 16px',
-            width: '420px',
-            transition: 'all 0.3s ease',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-            backdropFilter: 'blur(10px)'
-          }}
-        >
-          <button
-            type="submit"
-            style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            aria-label="Search"
-            title="Search"
-          >
-            <Search size={18} aria-hidden="true" />
-          </button>
-          <input
-            type="text"
-            placeholder="Search movies, shows, anime..."
-            value={searchQuery}
-            aria-label="Search movies, shows, anime"
-            onFocus={() => {
-              if (liveSuggestions.length > 0 && location.pathname !== '/search') {
-                setShowSearchSuggestions(true)
-              }
-            }}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#fff',
-              outline: 'none',
-              padding: '8px 12px',
-              width: '100%',
-              fontSize: '0.95rem'
-            }}
-          />
-          {searchQuery && (
+  const handleManualSimklSync = () => {
+    if (simklConnected && !isSyncingSimkl) {
+      syncSimklHistory(true).catch(() => {})
+    }
+  }
+
+  const unreadNotificationCount = useMemo(() => {
+    return notifications.filter((n) => !n.read).length
+  }, [notifications])
+
+  const markAllNotificationsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+  }
+
+  // Windows Breadcrumb / Page Title resolution
+  const breadcrumb = useMemo(() => {
+    const path = location.pathname
+    if (path === '/') return { icon: Home, label: 'Home', section: 'Explore' }
+    if (path.startsWith('/search')) return { icon: Search, label: 'Search', section: 'Explore' }
+    if (path.startsWith('/discover')) return { icon: Compass, label: 'Discover', section: 'Explore' }
+    if (path.startsWith('/library')) return { icon: Library, label: 'Library', section: 'Media' }
+    if (path.startsWith('/downloads')) return { icon: Download, label: 'Downloads', section: 'Media' }
+    if (path.startsWith('/settings')) return { icon: Settings, label: 'Settings', section: 'System' }
+    if (path.startsWith('/detail')) return { icon: Film, label: 'Media Details', section: 'Catalog' }
+    return { icon: Home, label: 'Nuvio', section: 'App' }
+  }, [location.pathname])
+
+  const BreadcrumbIcon = breadcrumb.icon
+  const userDisplayName = simklUser?.name || simklUser?.username || (nuvioEmail ? nuvioEmail.split('@')[0] : 'User')
+  const userInitial = userDisplayName ? userDisplayName.charAt(0).toUpperCase() : 'U'
+
+  return (
+    <header className={`navbar ${scrolled ? 'scrolled' : ''}`} role="banner">
+      <div className="navbar-container">
+        {/* Left Section: Mobile Toggle & Windows Explorer Breadcrumb */}
+        <div className="navbar-left">
+          {onToggleSidebar && (
             <button
               type="button"
-              aria-label="Clear search"
-              onClick={() => {
-                setSearchQuery('')
-                setShowSearchSuggestions(false)
-                if (location.pathname === '/search') navigate('/search')
-              }}
-              style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              className="navbar-mobile-toggle"
+              onClick={onToggleSidebar}
+              aria-label="Toggle navigation menu"
             >
-              <X size={16} aria-hidden="true" />
+              <Menu size={20} aria-hidden="true" />
             </button>
           )}
-        </form>
 
-        {/* Live Search Suggestions Dropdown */}
-        {showSearchSuggestions && liveSuggestions.length > 0 && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '52px',
-              left: 0,
-              width: '100%',
-              background: 'rgba(15, 15, 22, 0.95)',
-              backdropFilter: 'blur(25px)',
-              WebkitBackdropFilter: 'blur(25px)',
-              border: '1px solid rgba(168, 85, 247, 0.3)',
-              borderRadius: '16px',
-              boxShadow: '0 15px 50px rgba(0,0,0,0.8), 0 0 25px rgba(168, 85, 247, 0.2)',
-              overflow: 'hidden',
-              zIndex: 1100,
-              animation: 'fadeIn 0.2s ease',
+          <a
+            href="/"
+            ref={brandRef}
+            className={`navbar-brand ${brandFocused ? 'focused' : ''}`}
+            onClick={(e) => {
+              e.preventDefault()
+              navigate('/')
             }}
+            aria-label="Nuvio Home"
           >
-            <div style={{ padding: '8px 16px', fontSize: '0.75rem', color: 'var(--color-accent-primary, #a855f7)', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Zap size={14} aria-hidden="true" /> INSTANT MATCHES
-            </div>
-            {liveSuggestions.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => handleSelectSuggestion(item)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '10px 16px',
-                  cursor: 'pointer',
-                  transition: 'background 0.2s ease',
-                  borderBottom: '1px solid rgba(255,255,255,0.04)',
-                }}
-                onMouseOver={(e) => (e.currentTarget.style.background = 'rgba(168, 85, 247, 0.15)')}
-                onMouseOut={(e) => (e.currentTarget.style.background = 'transparent')}
-              >
-                {item.poster ? (
-                  <img
-                    src={item.poster}
-                    alt={item.name}
-                    loading="lazy"
-                    style={{ width: '32px', height: '46px', objectFit: 'cover', borderRadius: '4px' }}
-                  />
-                ) : (
-                  <div style={{ width: '32px', height: '46px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                    <Film size={16} aria-hidden="true" />
-                  </div>
-                )}
-                <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {item.name}
-                  </p>
-                  <div style={{ display: 'flex', gap: '8px', fontSize: '0.75rem', color: '#aaa', marginTop: '2px' }}>
-                    {item.year && <span>{item.year}</span>}
-                    {item.type && <span style={{ textTransform: 'capitalize', color: 'var(--color-accent-secondary, #f472b6)' }}>{item.type}</span>}
-                    {item.imdbRating && <span>⭐ {item.imdbRating}</span>}
-                  </div>
-                </div>
-              </div>
-            ))}
-            <div
-              onClick={handleSearch}
-              style={{
-                padding: '10px 16px',
-                textAlign: 'center',
-                fontSize: '0.8rem',
-                color: 'var(--color-accent-primary, #a855f7)',
-                fontWeight: 600,
-                cursor: 'pointer',
-                background: 'rgba(168, 85, 247, 0.08)',
-              }}
-              onMouseOver={(e) => (e.currentTarget.style.background = 'rgba(168, 85, 247, 0.2)')}
-              onMouseOut={(e) => (e.currentTarget.style.background = 'rgba(168, 85, 247, 0.08)')}
-            >
-              View all results for "{searchQuery}" →
-            </div>
+            <span className="navbar-brand-badge">NUVIO</span>
+          </a>
+
+          {/* Windows Breadcrumb */}
+          <div className="navbar-breadcrumb" aria-label="Breadcrumb">
+            <span className="breadcrumb-separator">
+              <ChevronRight size={14} aria-hidden="true" />
+            </span>
+            <span className="breadcrumb-section">{breadcrumb.section}</span>
+            <span className="breadcrumb-separator">
+              <ChevronRight size={14} aria-hidden="true" />
+            </span>
+            <span className="breadcrumb-current">
+              <BreadcrumbIcon size={15} className="breadcrumb-icon" aria-hidden="true" />
+              <span>{breadcrumb.label}</span>
+            </span>
           </div>
-        )}
-      </div>
-
-      <div className="navbar-right" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-        <div className="status-indicators" style={{ display: 'flex', gap: '10px' }}>
-          <span 
-            style={{
-              padding: '6px 12px',
-              borderRadius: '20px',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              background: torboxConnected ? 'rgba(46, 213, 115, 0.15)' : 'rgba(255, 71, 87, 0.15)',
-              color: torboxConnected ? '#2ed573' : '#ff4757',
-              border: `1px solid ${torboxConnected ? 'rgba(46, 213, 115, 0.3)' : 'rgba(255, 71, 87, 0.3)'}`,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-            title={torboxConnected ? 'TorBox Connected' : 'TorBox Not Connected'}
-          >
-            <Package size={14} aria-hidden="true" /> TorBox
-          </span>
-          <span 
-            style={{
-              padding: '6px 12px',
-              borderRadius: '20px',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              background: simklConnected ? 'rgba(46, 213, 115, 0.15)' : 'rgba(255, 71, 87, 0.15)',
-              color: simklConnected ? '#2ed573' : '#ff4757',
-              border: `1px solid ${simklConnected ? 'rgba(46, 213, 115, 0.3)' : 'rgba(255, 71, 87, 0.3)'}`,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-            title={simklConnected ? 'Simkl Connected' : 'Simkl Not Connected'}
-          >
-            <BarChart2 size={14} aria-hidden="true" /> Simkl
-          </span>
         </div>
 
-        <div style={{ position: 'relative' }} ref={dropdownRef}>
-          <button 
-            onClick={() => setShowDropdown(!showDropdown)}
-            aria-label="User menu"
-            style={{
-              background: 'linear-gradient(135deg, #6c5ce7, #a29bfe)',
-              border: '2px solid rgba(255,255,255,0.2)',
-              borderRadius: '50%',
-              width: '40px',
-              height: '40px',
-              cursor: 'pointer',
-              color: '#fff',
-              fontWeight: 'bold',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 15px rgba(108, 92, 231, 0.4)',
-              transition: 'transform 0.2s'
+        {/* Center Section: Global Autocomplete Search Bar */}
+        <div className="navbar-center" ref={searchBoxRef}>
+          <form
+            className={`navbar-search ${searchFocused ? 'focused' : ''}`}
+            onSubmit={handleSearchSubmit}
+            ref={(node) => {
+              if (searchRef) (searchRef as any).current = node
             }}
-            onMouseOver={e => (e.currentTarget.style.transform = 'scale(1.05)')}
-            onMouseOut={e => (e.currentTarget.style.transform = 'scale(1)')}
           >
-            U
-          </button>
-          
-          {showDropdown && (
-            <div style={{
-              position: 'absolute',
-              top: '55px',
-              right: '0',
-              background: 'rgba(20, 20, 25, 0.95)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '12px',
-              padding: '8px 0',
-              width: '200px',
-              boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
-              zIndex: 1001,
-              animation: 'fadeIn 0.2s ease'
-            }}>
-              <div className="dropdown-item" onClick={() => { navigate('/settings'); setShowDropdown(false); }}>
-                <Settings size={18} aria-hidden="true" /> Settings
+            <button
+              type="submit"
+              className="navbar-search-btn"
+              aria-label="Submit search"
+              title="Search"
+            >
+              <Search size={16} aria-hidden="true" />
+            </button>
+
+            <input
+              ref={searchInputRef}
+              type="text"
+              className="navbar-search-input"
+              placeholder="Search movies, series, anime, torrents... (Ctrl+K)"
+              value={searchQuery}
+              aria-label="Search media catalog"
+              aria-autocomplete="list"
+              aria-expanded={showSearchSuggestions}
+              onFocus={() => {
+                if (liveSuggestions.length > 0 && location.pathname !== '/search') {
+                  setShowSearchSuggestions(true)
+                }
+              }}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+
+            <div className="navbar-search-actions">
+              {searchQuery ? (
+                <button
+                  type="button"
+                  className="navbar-search-clear"
+                  aria-label="Clear search query"
+                  onClick={() => {
+                    setSearchQuery('')
+                    setShowSearchSuggestions(false)
+                    if (location.pathname === '/search') navigate('/search')
+                  }}
+                >
+                  <X size={14} aria-hidden="true" />
+                </button>
+              ) : (
+                <kbd className="navbar-search-shortcut" title="Press Ctrl+K to search">
+                  Ctrl K
+                </kbd>
+              )}
+            </div>
+          </form>
+
+          {/* Autocomplete Suggestions Popup */}
+          {showSearchSuggestions && liveSuggestions.length > 0 && (
+            <div className="search-autocomplete-dropdown" role="listbox">
+              <div className="autocomplete-header">
+                <span className="autocomplete-header-title">
+                  <Zap size={14} className="autocomplete-header-icon" aria-hidden="true" />
+                  INSTANT SUGGESTIONS
+                </span>
+                <span className="autocomplete-header-count">{liveSuggestions.length} found</span>
               </div>
-              <div className="dropdown-item" onClick={() => { navigate('/library'); setShowDropdown(false); }}>
-                <Library size={18} aria-hidden="true" /> Library
+
+              <div className="autocomplete-items">
+                {liveSuggestions.map((item) => (
+                  <div
+                    key={item.id}
+                    className="autocomplete-item"
+                    role="option"
+                    aria-selected={false}
+                    onClick={() => handleSelectSuggestion(item)}
+                  >
+                    {item.poster ? (
+                      <img
+                        src={item.poster}
+                        alt={item.name}
+                        loading="lazy"
+                        className="autocomplete-poster"
+                      />
+                    ) : (
+                      <div className="autocomplete-poster-fallback">
+                        <Film size={16} aria-hidden="true" />
+                      </div>
+                    )}
+                    <div className="autocomplete-meta">
+                      <p className="autocomplete-title">{item.name}</p>
+                      <div className="autocomplete-tags">
+                        {item.year && <span className="autocomplete-tag year">{item.year}</span>}
+                        {item.type && <span className="autocomplete-tag type">{item.type}</span>}
+                        {item.imdbRating && (
+                          <span className="autocomplete-tag rating">★ {item.imdbRating}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', margin: '4px 0' }}></div>
-              <div className="dropdown-item" style={{ color: '#ff4757' }} onClick={() => setShowDropdown(false)}>
-                <LogOut size={18} aria-hidden="true" /> Logout
-              </div>
+
+              <button
+                type="button"
+                className="autocomplete-footer"
+                onClick={handleSearchSubmit}
+              >
+                <span>Press Enter for all results for "<strong>{searchQuery}</strong>"</span>
+                <ChevronRight size={14} aria-hidden="true" />
+              </button>
             </div>
           )}
         </div>
+
+        {/* Right Section: Status Pills, Notifications & Profile Dropdown */}
+        <div className="navbar-right">
+          {/* Status Indicators (TorBox & Simkl) */}
+          <div className="navbar-status-group">
+            {/* TorBox Pill */}
+            <div
+              className={`navbar-status-pill ${torboxConnected ? 'active' : 'inactive'}`}
+              title={torboxConnected ? 'TorBox Debrid API Connected' : 'TorBox Not Connected'}
+            >
+              <span className={`navbar-status-dot ${torboxConnected ? 'online' : 'offline'}`} />
+              <Package size={14} className="navbar-status-icon" aria-hidden="true" />
+              <span className="navbar-status-label">TorBox</span>
+            </div>
+
+            {/* Simkl Pill */}
+            <div
+              className={`navbar-status-pill simkl ${simklConnected ? (isSyncingSimkl ? 'syncing' : 'active') : 'inactive'}`}
+              onClick={handleManualSimklSync}
+              role="button"
+              tabIndex={0}
+              title={
+                simklConnected
+                  ? isSyncingSimkl
+                    ? 'Syncing with Simkl cloud...'
+                    : 'Simkl Connected. Click to sync.'
+                  : 'Simkl Not Connected'
+              }
+            >
+              <span
+                className={`navbar-status-dot ${simklConnected ? (isSyncingSimkl ? 'syncing' : 'online') : 'offline'}`}
+              />
+              <BarChart2 size={14} className="navbar-status-icon" aria-hidden="true" />
+              <span className="navbar-status-label">
+                {isSyncingSimkl ? 'Syncing...' : 'Simkl'}
+              </span>
+              {isSyncingSimkl && (
+                <RefreshCw size={12} className="animate-spin ml-1" aria-hidden="true" />
+              )}
+            </div>
+          </div>
+
+          {/* Notification Bell Dropdown */}
+          <div className="navbar-dropdown-wrapper" ref={notificationDropdownRef}>
+            <button
+              type="button"
+              className={`navbar-icon-btn ${showNotifications ? 'active' : ''}`}
+              onClick={() => {
+                setShowNotifications(!showNotifications)
+                setShowProfileDropdown(false)
+              }}
+              aria-label={`Notifications (${unreadNotificationCount} unread)`}
+              aria-expanded={showNotifications}
+            >
+              <Bell size={18} aria-hidden="true" />
+              {unreadNotificationCount > 0 && (
+                <span className="navbar-notification-badge">{unreadNotificationCount}</span>
+              )}
+            </button>
+
+            {showNotifications && (
+              <div className="navbar-dropdown-menu notification-menu" role="menu">
+                <div className="notification-menu-header">
+                  <span className="notification-menu-title">Notifications</span>
+                  {unreadNotificationCount > 0 && (
+                    <button
+                      type="button"
+                      className="notification-mark-all"
+                      onClick={markAllNotificationsRead}
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+
+                <div className="notification-list">
+                  {notifications.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`notification-item ${!item.read ? 'unread' : ''}`}
+                      role="menuitem"
+                    >
+                      <div className="notification-item-icon">
+                        {item.type === 'success' ? (
+                          <CheckCircle2 size={16} className="text-success" aria-hidden="true" />
+                        ) : item.type === 'warning' ? (
+                          <AlertCircle size={16} className="text-warning" aria-hidden="true" />
+                        ) : (
+                          <Sparkles size={16} className="text-cyan" aria-hidden="true" />
+                        )}
+                      </div>
+                      <div className="notification-item-content">
+                        <p className="notification-item-title">{item.title}</p>
+                        <p className="notification-item-msg">{item.message}</p>
+                        <span className="notification-item-time">{item.time}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="notification-menu-footer">
+                  <span className="notification-footer-text">Windows Nuvio 2.0 Engine Active</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Profile Avatar Dropdown */}
+          <div className="navbar-dropdown-wrapper" ref={profileDropdownRef}>
+            <button
+              type="button"
+              className="navbar-avatar-btn"
+              onClick={() => {
+                setShowProfileDropdown(!showProfileDropdown)
+                setShowNotifications(false)
+              }}
+              aria-label="User account menu"
+              aria-expanded={showProfileDropdown}
+            >
+              {simklUser?.avatar ? (
+                <img src={simklUser.avatar} alt={userDisplayName} className="navbar-avatar-img" />
+              ) : (
+                <span className="navbar-avatar-initial">{userInitial}</span>
+              )}
+              <span className={`navbar-avatar-status ${simklConnected ? 'online' : 'offline'}`} />
+            </button>
+
+            {showProfileDropdown && (
+              <div className="navbar-dropdown-menu profile-menu" role="menu">
+                <div className="profile-menu-header">
+                  <div className="profile-menu-avatar">
+                    {userInitial}
+                  </div>
+                  <div className="profile-menu-user-info">
+                    <p className="profile-menu-name">{userDisplayName}</p>
+                    <p className="profile-menu-email">{nuvioEmail || 'Local Profile'}</p>
+                  </div>
+                </div>
+
+                <div className="profile-menu-divider" />
+
+                <div
+                  className="profile-menu-item"
+                  role="menuitem"
+                  onClick={() => {
+                    navigate('/library')
+                    setShowProfileDropdown(false)
+                  }}
+                >
+                  <Library size={16} aria-hidden="true" />
+                  <span>My Library</span>
+                </div>
+
+                <div
+                  className="profile-menu-item"
+                  role="menuitem"
+                  onClick={() => {
+                    navigate('/downloads')
+                    setShowProfileDropdown(false)
+                  }}
+                >
+                  <Download size={16} aria-hidden="true" />
+                  <span>Downloads</span>
+                </div>
+
+                <div
+                  className="profile-menu-item"
+                  role="menuitem"
+                  onClick={() => {
+                    navigate('/settings')
+                    setShowProfileDropdown(false)
+                  }}
+                >
+                  <Settings size={16} aria-hidden="true" />
+                  <span>Settings & Addons</span>
+                </div>
+
+                {simklConnected && (
+                  <div
+                    className="profile-menu-item"
+                    role="menuitem"
+                    onClick={() => {
+                      handleManualSimklSync()
+                      setShowProfileDropdown(false)
+                    }}
+                  >
+                    <RefreshCw size={16} className={isSyncingSimkl ? 'animate-spin' : ''} aria-hidden="true" />
+                    <span>Sync Simkl Watchlist</span>
+                  </div>
+                )}
+
+                <div className="profile-menu-divider" />
+
+                <div className="profile-menu-theme-indicator">
+                  <span className="theme-indicator-dot" />
+                  <span>Windows Nuvio Dark (Fluent)</span>
+                </div>
+
+                <div className="profile-menu-divider" />
+
+                <div
+                  className="profile-menu-item logout"
+                  role="menuitem"
+                  onClick={handleLogout}
+                >
+                  <LogOut size={16} aria-hidden="true" />
+                  <span>Sign Out</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
-    </nav>
+    </header>
   )
 }

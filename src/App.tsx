@@ -5,6 +5,8 @@ import Layout from './components/layout/Layout'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import Login from './pages/Login'
 import Home from './pages/Home'
+import Discover from './pages/Discover'
+import Downloads from './pages/Downloads'
 import Detail from './pages/Detail'
 import Search from './pages/Search'
 import Library from './pages/Library'
@@ -40,6 +42,16 @@ function App() {
         <Route path="/" element={
           <ErrorBoundary fallbackTitle="Home Feed Error">
             {nuvioLoggedIn ? <Home /> : <Navigate to="/login" replace />}
+          </ErrorBoundary>
+        } />
+        <Route path="/discover" element={
+          <ErrorBoundary fallbackTitle="Discover Error">
+            <Discover />
+          </ErrorBoundary>
+        } />
+        <Route path="/downloads" element={
+          <ErrorBoundary fallbackTitle="Downloads Error">
+            <Downloads />
           </ErrorBoundary>
         } />
         <Route path="/search" element={
