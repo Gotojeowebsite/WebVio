@@ -14,6 +14,12 @@ export interface SimklUser {
   avatar?: string;
 }
 
+export interface TraktUser {
+  username?: string;
+  name?: string;
+  avatar?: string;
+}
+
 interface AuthState {
   nuvioAccessToken: string | null;
   nuvioRefreshToken: string | null;
@@ -29,7 +35,7 @@ interface AuthState {
   simklClientId: string;
   simklClientSecret: string;
   traktAccessToken: string | null;
-  traktUser: any | null;
+  traktUser: TraktUser | null;
   traktConnected: boolean;
   traktClientId: string;
   corsProxyUrl: string;
@@ -42,7 +48,7 @@ interface AuthState {
   clearSimklAuth: () => void;
   setSimklClientId: (id: string) => void;
   setSimklClientSecret: (secret: string) => void;
-  setTraktAuth: (accessToken: string, user?: any) => void;
+  setTraktAuth: (accessToken: string, user?: TraktUser) => void;
   clearTraktAuth: () => void;
   setTraktClientId: (id: string) => void;
   setCorsProxyUrl: (url: string) => void;

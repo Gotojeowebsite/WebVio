@@ -1,11 +1,11 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { ChevronLeft, ChevronRight, Inbox } from 'lucide-react'
-import { MetaPreview } from '../../api/addon-client'
+import { MetaPreview, Video } from '../../api/addon-client'
 import MediaCard from './MediaCard'
 
 interface Props {
   title: string
-  items: (MetaPreview & { video?: any; progressPercent?: number })[]
+  items: (MetaPreview & { video?: Video; progressPercent?: number })[]
   loading?: boolean
 }
 
