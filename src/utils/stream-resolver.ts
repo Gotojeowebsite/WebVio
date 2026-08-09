@@ -5,14 +5,26 @@ export interface ParsedStreamInfo {
   quality: string | null
   codec: string | null
   size: string | null
+  sizeBytes: number | null
   seeders: number | null
   source: string | null
   hdr: boolean
   audio: string | null
+  cleanTitle: string
 }
 
 export function parseStreamInfo(stream: Stream): ParsedStreamInfo {
-  const text = `${stream.name || ''} ${stream.title || ''} ${stream.behaviorHints?.filename || ''}`
+  const text = `${stream.name || ''}\n${stream.title || ''}\n${stream.behaviorHints?.filename || ''}`
+
+  // AIOStreams formatting often includes source addon in brackets [AddonName] or with gear ⚙️ AddonName
+  let source: string | null = null
+  const aioSourceMatch = text.match(/⚙️\s*([a-zA-Z0-9_ .-]+)/) || text.match(/\[([a-zA-Z0-9_ .-]+)\]/)
+  if (aioSourceMatch) {
+    source = aioSourceMatch[1].trim()
+  } else {
+    const sourceMatch = (stream.name || '').split('\n')[0]
+    if (sourceMatch) source = sourceMatch
+  }
 
   // Quality
   let quality: string | null = null
@@ -29,12 +41,20 @@ export function parseStreamInfo(stream: Stream): ParsedStreamInfo {
 
   // Size
   let size: string | null = null
-  const sizeMatch = text.match(/(\d+\.?\d*)\s*(GB|MB|TB)/i)
-  if (sizeMatch) size = `${sizeMatch[1]} ${sizeMatch[2].toUpperCase()}`
+  let sizeBytes: number | null = null
+  const sizeMatch = text.match(/(?:💾|📁)?\s*(\d+\.?\d*)\s*(GB|MB|TB)/i)
+  if (sizeMatch) {
+    const val = parseFloat(sizeMatch[1])
+    const unit = sizeMatch[2].toUpperCase()
+    size = `${val} ${unit}`
+    if (unit === 'GB') sizeBytes = val * 1024 * 1024 * 1024
+    else if (unit === 'MB') sizeBytes = val * 1024 * 1024
+    else if (unit === 'TB') sizeBytes = val * 1024 * 1024 * 1024 * 1024
+  }
 
   // Seeders
   let seeders: number | null = null
-  const seedMatch = text.match(/👤\s*(\d+)/i) || text.match(/(\d+)\s*seed/i)
+  const seedMatch = text.match(/[👤👥]\s*(\d+)/i) || text.match(/(\d+)\s*seed/i)
   if (seedMatch) seeders = parseInt(seedMatch[1])
 
   // HDR
@@ -48,12 +68,17 @@ export function parseStreamInfo(stream: Stream): ParsedStreamInfo {
   else if (/dd[p+]?\s?5\.1|eac3|ddp/i.test(text)) audio = 'DD+ 5.1'
   else if (/aac/i.test(text)) audio = 'AAC'
 
-  // Source addon
-  let source: string | null = null
-  const sourceMatch = (stream.name || '').split('\n')[0]
-  if (sourceMatch) source = sourceMatch
+  // Clean Title
+  let cleanTitle = stream.behaviorHints?.filename || stream.title?.split('\n')[0] || stream.name?.split('\n')[0] || 'Unknown Stream'
+  
+  if (stream.title && stream.title.includes('\n')) {
+     cleanTitle = stream.title.split('\n')[0]
+  }
 
-  return { quality, codec, size, seeders, hdr, audio, source }
+  // Remove common AIO bracket prefix like [Addon] 
+  cleanTitle = cleanTitle.replace(/^\[.*?\]\s*/, '')
+
+  return { quality, codec, size, sizeBytes, seeders, hdr, audio, source, cleanTitle }
 }
 
 export async function resolveStreamUrl(

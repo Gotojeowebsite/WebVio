@@ -31,6 +31,8 @@ const DEFAULT_ADDON_URLS = [
   'https://opensubtitles-v3.strem.io/manifest.json',
 ];
 
+let loadStoragePromise: Promise<void> | null = null;
+
 export const useAddonStore = create<AddonState>((set, get) => ({
   addons: [],
   loading: false,
@@ -47,7 +49,8 @@ export const useAddonStore = create<AddonState>((set, get) => ({
         targetUrls.map(async (url: string, index: number) => {
           try {
             const client = new AddonClient(url);
-            const manifest = await client.loadManifest();
+            const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000));
+            const manifest = await Promise.race([client.loadManifest(), timeout]);
             return { manifestUrl: url, manifest, enabled: true, order: index };
           } catch {
             return null;
@@ -81,6 +84,11 @@ export const useAddonStore = create<AddonState>((set, get) => ({
       enabled: true,
       order: get().addons.length,
     };
+
+    // Check again to avoid race conditions after async operation
+    if (get().addons.find(a => a.manifestUrl === manifestUrl)) {
+      throw new Error('Addon already installed');
+    }
 
     const newAddons = [...get().addons, addon];
     set({ addons: newAddons });
@@ -186,43 +194,52 @@ export const useAddonStore = create<AddonState>((set, get) => ({
     localStorage.setItem('webvio_addons', JSON.stringify(data));
   },
 
-  loadFromStorage: async () => {
-    const stored = localStorage.getItem('webvio_addons');
-    if (stored) {
-      try {
-        const data = JSON.parse(stored) as InstalledAddon[];
-        if (data && data.length > 0) {
-          set({ addons: data });
-          return;
-        }
-      } catch {
-        // Fallback to default
-      }
-    }
-
-    // Initialize with default addons if none stored
-    set({ loading: true });
-    try {
-      const defaultAddons: InstalledAddon[] = [];
-      for (let i = 0; i < DEFAULT_ADDON_URLS.length; i++) {
-        const url = DEFAULT_ADDON_URLS[i];
+  loadFromStorage: () => {
+    if (loadStoragePromise) return loadStoragePromise;
+    
+    loadStoragePromise = (async () => {
+      const stored = localStorage.getItem('webvio_addons');
+      if (stored) {
         try {
-          const client = new AddonClient(url);
-          const manifest = await client.loadManifest();
-          defaultAddons.push({
-            manifestUrl: url,
-            manifest,
-            enabled: true,
-            order: i,
-          });
-        } catch (e) {
-          console.warn('Could not load default addon:', url, e);
+          const data = JSON.parse(stored) as InstalledAddon[];
+          if (data && data.length > 0) {
+            set({ addons: data });
+            return;
+          }
+        } catch {
+          // Fallback to default
         }
       }
-      set({ addons: defaultAddons, loading: false });
-      get().saveToStorage();
-    } catch {
-      set({ loading: false });
-    }
+
+      // Initialize with default addons if none stored
+      set({ loading: true });
+      try {
+        const defaultAddons: InstalledAddon[] = [];
+        for (let i = 0; i < DEFAULT_ADDON_URLS.length; i++) {
+          const url = DEFAULT_ADDON_URLS[i];
+          try {
+            const client = new AddonClient(url);
+            const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000));
+            const manifest = await Promise.race([client.loadManifest(), timeout]);
+            defaultAddons.push({
+              manifestUrl: url,
+              manifest,
+              enabled: true,
+              order: i,
+            });
+          } catch (e) {
+            console.warn('Could not load default addon:', url, e);
+          }
+        }
+        set({ addons: defaultAddons, loading: false });
+        get().saveToStorage();
+      } catch {
+        set({ loading: false });
+      }
+    })();
+    
+    return loadStoragePromise.finally(() => {
+      loadStoragePromise = null;
+    });
   },
 }));

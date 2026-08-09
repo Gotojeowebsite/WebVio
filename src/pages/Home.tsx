@@ -66,9 +66,30 @@ export default function Home() {
   // Load Continue Watching: Simkl "watching" list + local progress fallback
   useEffect(() => {
     const loadContinueWatching = async () => {
+      // Phase 1: Instant Load Local Cache
+      const localProgress = JSON.parse(localStorage.getItem('webvio_progress') || '{}')
+      const initialLocalItems: (MetaPreview & { video?: any; progressPercent?: number; lastWatchedAt?: number })[] = Object.values(localProgress)
+        .sort((a: any, b: any) => (b.updatedAt || 0) - (a.updatedAt || 0))
+        .slice(0, 20)
+        .map((p: any) => ({
+          id: p.meta.id,
+          type: p.meta.type,
+          name: p.meta.name,
+          poster: p.meta.poster,
+          video: p.video || null,
+          progressPercent: p.duration > 0 ? Math.round((p.time / p.duration) * 100) : undefined,
+          lastWatchedAt: p.updatedAt || 0,
+        }))
+      
+      setContinueWatching(initialLocalItems)
+
+      if (!simklConnected || !simklAccessToken || !simklClientId) {
+        setContinueLoading(false)
+        return
+      }
+
       setContinueLoading(true)
       try {
-        if (simklConnected && simklAccessToken && simklClientId) {
           // Fetch from Simkl — shows, movies, and anime
           const { getAllItems } = await import('../api/simkl')
 
@@ -170,22 +191,6 @@ export default function Home() {
           }
 
           setContinueWatching(merged.slice(0, 20))
-        } else {
-          // No Simkl — fall back to local progress only (most recent watch first)
-          const progress = JSON.parse(localStorage.getItem('webvio_progress') || '{}')
-          const items: (MetaPreview & { video?: any; progressPercent?: number })[] = Object.values(progress)
-            .sort((a: any, b: any) => (b.updatedAt || 0) - (a.updatedAt || 0))
-            .slice(0, 20)
-            .map((p: any) => ({
-              id: p.meta.id,
-              type: p.meta.type,
-              name: p.meta.name,
-              poster: p.meta.poster,
-              video: p.video || null,
-              progressPercent: p.duration > 0 ? Math.round((p.time / p.duration) * 100) : undefined,
-            }))
-          setContinueWatching(items)
-        }
       } catch (err) {
         console.error('Failed to load continue watching:', err)
         const progress = JSON.parse(localStorage.getItem('webvio_progress') || '{}')
@@ -209,6 +214,10 @@ export default function Home() {
 
   // Fetch catalogs from addons + default providers
   useEffect(() => {
+    let mounted = true
+    setHeroItems([])
+    setHero(null)
+
     const enabledAddons = addons.filter(a => a.enabled)
     const providersToLoad = enabledAddons.length > 0
       ? enabledAddons.map(a => ({ manifestUrl: a.manifestUrl, manifest: a.manifest }))
@@ -247,23 +256,28 @@ export default function Home() {
         const key = `${provider.manifest.id || provider.manifestUrl}:${cat.type}:${cat.id}`
         try {
           const result = await client.getCatalog(cat.type, cat.id)
+          if (!mounted) return
+          
           if (result && Array.isArray(result.metas) && result.metas.length > 0) {
             setCatalogs(prev =>
               prev.map(c => (c.key === key ? { ...c, items: result.metas, loading: false } : c))
             )
             setHeroItems(prev => {
-              const next = [...prev, ...result.metas.slice(0, 6)]
-              return next
+              const newItems = result.metas.slice(0, 6).filter(m => !prev.some(p => p.id === m.id))
+              return [...prev, ...newItems]
             })
             setHero(prev => prev || result.metas[0])
           } else {
             setCatalogs(prev => prev.filter(c => c.key !== key))
           }
         } catch {
+          if (!mounted) return
           setCatalogs(prev => prev.filter(c => c.key !== key))
         }
       })
     })
+
+    return () => { mounted = false }
   }, [addons])
 
   // Auto-rotate hero every 8 seconds
@@ -301,16 +315,17 @@ export default function Home() {
 
       {/* Hero Section */}
       {hero && (
-        <div
-          className="hero-section"
-          style={{
-            backgroundImage: hero.background
-              ? `url(${hero.background})`
-              : hero.poster
-              ? `url(${hero.poster})`
-              : 'none',
-          }}
-        >
+        <div className="hero-section">
+          <div 
+            className="hero-bg" 
+            style={{
+              backgroundImage: hero.background
+                ? `url(${hero.background})`
+                : hero.poster
+                ? `url(${hero.poster})`
+                : 'none',
+            }}
+          />
           <div className="hero-gradient" />
           <div className="hero-content">
             <h1 className="hero-title">{hero.name}</h1>
@@ -340,6 +355,14 @@ export default function Home() {
                 onClick={() => navigate(`/detail/${hero.type}/${encodeURIComponent(hero.id)}`)}
               >
                 ℹ️ More Info
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-lg"
+                onClick={() => navigate(`/wasm-player`)}
+                style={{ marginLeft: '10px', background: '#9c27b0' }}
+              >
+                🧪 Test Wasm Decoder
               </button>
             </div>
           </div>

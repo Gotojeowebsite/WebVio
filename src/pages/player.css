@@ -158,7 +158,7 @@
 
 .video-progress-bar {
   height: 100%;
-  background: #ff0044; /* Premium brand color */
+  background: var(--color-accent-gradient);
   border-radius: 3px;
   position: relative;
   pointer-events: none;
@@ -172,9 +172,9 @@
   position: absolute;
   right: -7px;
   top: -4px;
-  box-shadow: 0 0 10px rgba(255, 0, 68, 0.5);
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.8);
   transform: scale(0);
-  transition: transform 0.2s;
+  transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .video-progress-container:hover .video-progress-thumb {

@@ -47,13 +47,28 @@ export default function Player() {
         clearInterval(progressInterval.current)
       }
       saveProgress() // Save on unmount
+      clearPlayer() // Clear stale state
     }
-  }, [saveProgress])
+  }, [saveProgress, clearPlayer])
 
   // Get start time for resume
-  const startTime = currentMeta
+  const savedTime = currentMeta
     ? loadProgress(currentVideo?.id || currentMeta.id)
     : 0
+
+  const [promptResume, setPromptResume] = useState(savedTime > 30)
+  const [startTime, setStartTime] = useState(0)
+  const [actuallyStart, setActuallyStart] = useState(!promptResume)
+
+  const handleResumeChoice = (resume: boolean) => {
+    if (resume) {
+      setStartTime(savedTime)
+    } else {
+      setStartTime(0)
+    }
+    setPromptResume(false)
+    setActuallyStart(true)
+  }
 
   const triggerScrobble = useCallback(() => {
     if (scrobbled.current || !currentMeta) return
@@ -115,6 +130,11 @@ export default function Player() {
     }
   }, [currentMeta, currentVideo, simklConnected, simklAccessToken, simklClientId, traktConnected, traktAccessToken, traktClientId])
 
+  const currentIndex = currentVideo && currentMeta?.videos ? currentMeta.videos.findIndex(v => v.id === currentVideo.id) : -1
+  const nextVideo = currentIndex !== -1 && currentMeta?.videos && currentIndex + 1 < currentMeta.videos.length ? currentMeta.videos[currentIndex + 1] : null
+
+  const [countdown, setCountdown] = useState<number | null>(null)
+
   const handleTimeUpdate = useCallback((time: number) => {
     updateTime(time)
 
@@ -123,12 +143,22 @@ export default function Player() {
     if (!scrobbled.current && duration > 0 && time / duration > 0.75) {
       triggerScrobble()
     }
-  }, [updateTime, triggerScrobble])
+
+    // Auto-Play Countdown logic
+    if (nextVideo && duration > 0 && duration - time <= 10 && duration - time > 0) {
+      setCountdown(Math.ceil(duration - time))
+    } else if (countdown !== null) {
+      setCountdown(null)
+    }
+  }, [updateTime, triggerScrobble, nextVideo, countdown])
 
   const handleEnded = useCallback(() => {
     triggerScrobble()
     saveProgress()
-  }, [triggerScrobble, saveProgress])
+    if (nextVideo && currentMeta) {
+      navigate(`/detail/${currentMeta.type}/${encodeURIComponent(currentMeta.id)}?episode=${encodeURIComponent(nextVideo.id)}`)
+    }
+  }, [triggerScrobble, saveProgress, nextVideo, currentMeta, navigate])
 
   const handleBack = () => {
     saveProgress()
@@ -147,8 +177,32 @@ export default function Player() {
     )
   }
 
+  if (promptResume) {
+    const m = Math.floor(savedTime / 60)
+    const s = Math.floor(savedTime % 60)
+    const timeStr = `${m}:${s < 10 ? '0' : ''}${s}`
+    return (
+      <div className="player-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0f', color: '#fff' }}>
+        <div style={{ textAlign: 'center', background: '#1a1a2e', padding: '3rem', borderRadius: '16px', border: '1px solid #333' }}>
+          <h2 style={{ marginBottom: '1rem', fontSize: '2rem' }}>Resume Playback?</h2>
+          <p style={{ color: '#aaa', marginBottom: '2rem' }}>You left off at {timeStr}</p>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+            <button className="btn btn-primary btn-lg" onClick={() => handleResumeChoice(true)}>
+              ▶ Resume from {timeStr}
+            </button>
+            <button className="btn btn-secondary btn-lg" onClick={() => handleResumeChoice(false)}>
+              Start from Beginning
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!actuallyStart) return null
+
   return (
-    <div className="player-page">
+    <div className="player-page" style={{ position: 'relative' }}>
       <VideoPlayer
         src={currentStream.url}
         title={currentMeta?.name || 'Playing'}
@@ -161,6 +215,18 @@ export default function Player() {
         startTime={startTime}
         subtitles={subtitles}
       />
+      
+      {countdown !== null && nextVideo && (
+        <div style={{
+          position: 'absolute', bottom: '120px', right: '40px', background: 'rgba(0,0,0,0.8)',
+          padding: '20px', borderRadius: '12px', border: '1px solid #333', zIndex: 100,
+          color: '#fff', display: 'flex', flexDirection: 'column', gap: '10px'
+        }}>
+          <h4 style={{ margin: 0, color: '#aaa' }}>Up Next in {countdown}</h4>
+          <p style={{ margin: 0, fontWeight: 'bold' }}>S{nextVideo.season}E{nextVideo.episode} - {nextVideo.title}</p>
+          <button className="btn btn-primary" onClick={handleEnded}>Play Now</button>
+        </div>
+      )}
     </div>
   )
 }

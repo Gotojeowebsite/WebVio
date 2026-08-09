@@ -1,27 +1,27 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
 
 :root {
-  /* Nuvio Obsidian & Purple Palette */
-  --color-bg-base: #050505;
-  --color-bg-elevated: #09090b;
-  --color-surface-1: #121217;
-  --color-surface-2: #1a1a24;
+  /* Nuvio Deep Space Palette */
+  --color-bg-base: #0A0A0F;
+  --color-bg-elevated: #14141E;
+  --color-surface-1: #1C1C28;
+  --color-surface-2: #242432;
   
   --color-accent-primary: #a855f7; /* Vibrant violet */
   --color-accent-secondary: #f472b6; /* Neon pink glow */
   --color-accent-gradient: linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-secondary));
   
-  --color-text-primary: #ffffff;
-  --color-text-secondary: #a1a1aa;
-  --color-text-muted: #71717a;
+  --color-text-primary: #f8f8f8;
+  --color-text-secondary: rgba(255, 255, 255, 0.7);
+  --color-text-muted: rgba(255, 255, 255, 0.4);
   
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-error: #ef4444;
   
-  --color-glass: rgba(15, 15, 20, 0.5);
-  --color-glass-border: rgba(168, 85, 247, 0.3);
-  --color-glow-border: rgba(168, 85, 247, 0.6);
+  --color-glass: rgba(20, 20, 30, 0.6);
+  --color-glass-border: rgba(168, 85, 247, 0.15);
+  --color-glow-border: rgba(168, 85, 247, 0.4);
 
   /* Typography */
   --font-family-base: 'Outfit', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -84,7 +84,7 @@
 
 html {
   font-family: var(--font-family-base);
-  line-height: 1.5;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--color-bg-base);
@@ -96,6 +96,27 @@ body {
   min-height: 100vh;
   background-color: var(--color-bg-base);
 }
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-base);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  border: 2px solid var(--color-bg-base);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 
 img, picture, video, canvas, svg {
   display: block;
@@ -127,11 +148,86 @@ button {
 }
 
 /* ==========================================================================
+   Buttons
+   ========================================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-4);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-normal);
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.btn-primary {
+  background: var(--color-accent-gradient);
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    to bottom right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.2) 40%,
+    rgba(255, 255, 255, 0.5) 50%,
+    rgba(255, 255, 255, 0.2) 60%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(45deg) translateY(-100%);
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.btn-primary:hover::after {
+  transform: rotate(45deg) translateY(100%);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(168, 85, 247, 0.6);
+}
+
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn-lg {
+  padding: var(--spacing-3) var(--spacing-6);
+  font-size: var(--font-size-base);
+}
+
+.w-full {
+  width: 100%;
+}
+
+
+/* ==========================================================================
    Typography
    ========================================================================== */
-h1 { font-size: var(--font-size-5xl); font-weight: 800; letter-spacing: -0.025em; line-height: 1.1; }
-h2 { font-size: var(--font-size-4xl); font-weight: 700; letter-spacing: -0.025em; line-height: 1.2; }
-h3 { font-size: var(--font-size-3xl); font-weight: 700; letter-spacing: -0.025em; line-height: 1.2; }
+h1 { font-size: var(--font-size-5xl); font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; font-family: 'Outfit', sans-serif; text-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+h2 { font-size: var(--font-size-4xl); font-weight: 700; letter-spacing: -0.03em; line-height: 1.2; font-family: 'Outfit', sans-serif; }
+h3 { font-size: var(--font-size-3xl); font-weight: 700; letter-spacing: -0.025em; line-height: 1.2; font-family: 'Outfit', sans-serif; }
 h4 { font-size: var(--font-size-2xl); font-weight: 600; line-height: 1.3; }
 h5 { font-size: var(--font-size-xl); font-weight: 600; line-height: 1.4; }
 h6 { font-size: var(--font-size-lg); font-weight: 600; line-height: 1.4; }
@@ -233,11 +329,52 @@ h6 { font-size: var(--font-size-lg); font-weight: 600; line-height: 1.4; }
 
 .card-glass {
   background: var(--color-glass);
-  backdrop-filter: blur(30px) saturate(150%);
-  -webkit-backdrop-filter: blur(30px) saturate(150%);
+  backdrop-filter: blur(40px) saturate(150%);
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
   border: 1px solid var(--color-glass-border);
-  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.1);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.05);
   border-radius: var(--radius-lg);
+}
+
+.media-card {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  cursor: pointer;
+  aspect-ratio: 2/3;
+  background: linear-gradient(145deg, var(--color-surface-1), var(--color-bg-elevated));
+  border: none;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+}
+
+.skeleton {
+  background: linear-gradient(135deg, var(--color-bg-elevated) 25%, var(--color-surface-1) 50%, var(--color-bg-elevated) 75%);
+  background-size: 400% 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+@keyframes shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98) translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.home-page, .detail-page, .search-page, .library-page, .settings-page, .page {
+  animation: pageFadeIn 0.5s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
 }
 
 /* ==========================================================================

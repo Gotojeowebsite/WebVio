@@ -14,16 +14,24 @@
 
 .detail-hero {
   position: relative;
-  min-height: 60vh;
-  background-size: cover;
-  background-position: center top;
+  min-height: 70vh;
   display: flex;
   align-items: flex-end;
+  overflow: hidden;
+}
+
+.detail-hero-bg {
+  position: absolute;
+  inset: -5%;
+  background-size: cover;
+  background-position: center top;
+  animation: kenBurns 30s ease-out infinite alternate;
+  z-index: 1;
 }
 
 .detail-hero-content {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   padding: var(--spacing-8) var(--spacing-8) var(--spacing-10);
   max-width: 700px;
 }

@@ -110,16 +110,19 @@ export class AddonClient {
 
   async getMeta(type: string, id: string): Promise<{ meta: Meta }> {
     const res = await fetchWithProxy(`${this.baseUrl}/meta/${type}/${id}.json`);
+    if (!res.ok) throw new Error(`Meta fetch failed: ${res.status}`);
     return res.json();
   }
 
   async getStreams(type: string, videoId: string): Promise<{ streams: Stream[] }> {
     const res = await fetchWithProxy(`${this.baseUrl}/stream/${type}/${videoId}.json`);
+    if (!res.ok) throw new Error(`Streams fetch failed: ${res.status}`);
     return res.json();
   }
 
   async getSubtitles(type: string, id: string): Promise<{ subtitles: Subtitle[] }> {
     const res = await fetchWithProxy(`${this.baseUrl}/subtitles/${type}/${id}.json`);
+    if (!res.ok) throw new Error(`Subtitles fetch failed: ${res.status}`);
     return res.json();
   }
 

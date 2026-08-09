@@ -91,7 +91,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const { currentMeta, currentVideo, currentTime, duration } = get();
     if (!currentMeta || currentTime < 10 || duration < 30) return;
     const videoId = currentVideo?.id || currentMeta.id;
-    const progress = JSON.parse(localStorage.getItem('webvio_progress') || '{}');
+    let progress: Record<string, any> = {};
+    try {
+      progress = JSON.parse(localStorage.getItem('webvio_progress') || '{}');
+    } catch {
+      // Ignore parse errors
+    }
     progress[videoId] = {
       time: currentTime,
       duration,
@@ -115,7 +120,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   loadProgress: (videoId) => {
-    const progress = JSON.parse(localStorage.getItem('webvio_progress') || '{}');
+    let progress: Record<string, any> = {};
+    try {
+      progress = JSON.parse(localStorage.getItem('webvio_progress') || '{}');
+    } catch {
+      // Ignore parse errors
+    }
     return progress[videoId]?.time || 0;
   },
 }));

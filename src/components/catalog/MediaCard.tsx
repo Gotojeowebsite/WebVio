@@ -56,22 +56,21 @@ export default function MediaCard({ item }: Props) {
       }}
       style={{
         position: 'relative',
-        borderRadius: '16px',
+        borderRadius: '12px',
         overflow: 'hidden',
         boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
         transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
         cursor: 'pointer',
         aspectRatio: '2/3',
-        background: 'linear-gradient(145deg, #1f1f2e, #13131c)',
-        border: '1px solid rgba(255,255,255,0.05)',
+        background: 'linear-gradient(145deg, var(--color-surface-1), var(--color-bg-elevated))',
+        border: 'none',
         width: '100%',
         height: '100%',
         userSelect: 'none',
       }}
       onMouseOver={e => {
         e.currentTarget.style.transform = 'scale(1.05) translateY(-8px)';
-        e.currentTarget.style.boxShadow = '0 20px 40px rgba(108, 92, 231, 0.25)';
-        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
+        e.currentTarget.style.boxShadow = '0 20px 40px rgba(168, 85, 247, 0.25)';
         const overlay = e.currentTarget.querySelector('.media-card-overlay') as HTMLElement;
         if (overlay) {
           overlay.style.opacity = '1';
@@ -81,7 +80,6 @@ export default function MediaCard({ item }: Props) {
       onMouseOut={e => {
         e.currentTarget.style.transform = 'scale(1) translateY(0)';
         e.currentTarget.style.boxShadow = '0 8px 30px rgba(0,0,0,0.3)';
-        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)';
         const overlay = e.currentTarget.querySelector('.media-card-overlay') as HTMLElement;
         if (overlay) {
           overlay.style.opacity = '0';
@@ -167,11 +165,10 @@ export default function MediaCard({ item }: Props) {
           WebkitBackdropFilter: 'blur(4px)',
           opacity: 0,
           transform: 'translateY(10px)',
-          transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+          transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) 0.15s',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'flex-end',
-          borderTop: '1px solid rgba(255,255,255,0.05)',
           pointerEvents: 'none',
         }}
       >

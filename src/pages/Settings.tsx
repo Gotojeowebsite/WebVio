@@ -7,12 +7,12 @@ export default function Settings() {
   const {
     nuvioEmail, nuvioLoggedIn, nuvioAccessToken,
     torboxApiKey, torboxConnected, torboxUser,
-    simklAccessToken, simklConnected, simklUser, simklClientId, simklClientSecret,
-    traktAccessToken, traktConnected, traktUser, traktClientId,
+    simklConnected, simklUser, simklClientId, simklClientSecret,
+    traktConnected, traktUser, traktClientId,
     corsProxyUrl,
     clearNuvioAuth, setTorboxAuth, clearTorboxAuth,
     setSimklAuth, clearSimklAuth, setSimklClientId, setSimklClientSecret,
-    setTraktAuth, clearTraktAuth,
+    clearTraktAuth,
     setCorsProxyUrl, setTraktClientId,
   } = useAuthStore()
 
@@ -22,10 +22,10 @@ export default function Settings() {
   const [searchParams] = useSearchParams()
 
   const [torboxKeyInput, setTorboxKeyInput] = useState(torboxApiKey || '')
-  const [corsInput, setCorsInput] = useState(corsProxyUrl)
-  const [simklIdInput, setSimklIdInput] = useState(simklClientId)
-  const [simklSecretInput, setSimklSecretInput] = useState(simklClientSecret)
-  const [traktIdInput, setTraktIdInput] = useState(traktClientId)
+  const [corsInput, setCorsInput] = useState(corsProxyUrl || '')
+  const [simklIdInput, setSimklIdInput] = useState(simklClientId || '')
+  const [simklSecretInput, setSimklSecretInput] = useState(simklClientSecret || '')
+  const [traktIdInput, setTraktIdInput] = useState(traktClientId || '')
   const [addonUrlInput, setAddonUrlInput] = useState('')
   const [addonLoading, setAddonLoading] = useState(false)
   const [torboxLoading, setTorboxLoading] = useState(false)
@@ -98,7 +98,7 @@ export default function Settings() {
       const user = await validateApiKey(torboxKeyInput.trim())
       setTorboxAuth(torboxKeyInput.trim(), user)
       setMessage({ text: 'TorBox connected!', type: 'success' })
-    } catch (err) {
+    } catch {
       setMessage({ text: 'Invalid TorBox API key', type: 'error' })
     } finally {
       setTorboxLoading(false)
@@ -112,7 +112,7 @@ export default function Settings() {
       await addAddonByUrl(addonUrlInput.trim())
       setAddonUrlInput('')
       setMessage({ text: 'Addon added!', type: 'success' })
-    } catch (err) {
+    } catch {
       setMessage({ text: 'Failed to add addon. Check the URL.', type: 'error' })
     } finally {
       setAddonLoading(false)

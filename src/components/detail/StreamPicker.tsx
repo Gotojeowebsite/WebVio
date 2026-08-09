@@ -167,9 +167,18 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
       const qa = qualityOrder[a.quality || ''] || 0
       const qb = qualityOrder[b.quality || ''] || 0
       if (qb !== qa) return qb - qa
+      
+      const infoA = parseStreamInfo(a)
+      const infoB = parseStreamInfo(b)
+      
+      // Then file size (largest first)
+      const sizeA = infoA.sizeBytes || 0
+      const sizeB = infoB.sizeBytes || 0
+      if (sizeB !== sizeA) return sizeB - sizeA
+      
       // Then seeders
-      const sa = parseStreamInfo(a).seeders || 0
-      const sb = parseStreamInfo(b).seeders || 0
+      const sa = infoA.seeders || 0
+      const sb = infoB.seeders || 0
       return sb - sa
     })
 
@@ -339,10 +348,7 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
                       </span>
                       <div className="stream-item-info">
                         <p className="stream-item-title">
-                          {stream.behaviorHints?.filename || 
-                           stream.title?.split('\n')[0] || 
-                           stream.name?.split('\n')[0] || 
-                           'Unknown Stream'}
+                          {info.cleanTitle}
                         </p>
                         <div className="stream-item-meta">
                           {info.quality && (
@@ -373,17 +379,12 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
                             </span>
                           )}
                         </div>
-                        <p className="stream-addon-source">{stream.addonName}</p>
+                        <p className="stream-addon-source">{info.source || stream.addonName}</p>
                       </div>
                     </div>
                     {isResolving && <div className="loading-spinner stream-spinner" />}
                   </div>
 
-                  {stream.title && stream.title.includes('\n') && (
-                    <p className="stream-item-detail">
-                      {stream.title.split('\n').slice(1).join(' • ')}
-                    </p>
-                  )}
                 </div>
               )
             })}
@@ -391,13 +392,23 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
         </div>
 
         {/* Footer */}
-        {!torboxConnected && streams.some(s => s.infoHash) && (
-          <div className="stream-picker-footer">
+        <div className="stream-picker-footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {!torboxConnected && streams.some(s => s.infoHash) && (
             <p className="text-xs text-muted">
               💡 Connect your TorBox account in Settings to unlock high-speed torrent streams. Direct streams (🔗) play for free!
             </p>
-          </div>
-        )}
+          )}
+          <button 
+            className="btn btn-secondary" 
+            style={{ width: '100%', border: '1px dashed #9c27b0', color: '#e879f9' }}
+            onClick={() => {
+              onClose()
+              navigate('/wasm-player')
+            }}
+          >
+            🧪 Got an unsupported local file? Decode it with our WASM Engine
+          </button>
+        </div>
       </div>
     </div>
   )

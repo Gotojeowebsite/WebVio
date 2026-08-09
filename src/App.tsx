@@ -9,6 +9,7 @@ import Search from './pages/Search'
 import Library from './pages/Library'
 import Settings from './pages/Settings'
 import Player from './pages/Player'
+import WasmPlayer from './pages/WasmPlayer'
 
 function App() {
   const { nuvioLoggedIn, loadFromStorage } = useAuthStore()
@@ -23,6 +24,7 @@ function App() {
         nuvioLoggedIn ? <Navigate to="/" replace /> : <Login />
       } />
       <Route path="/player" element={<Player />} />
+      <Route path="/wasm-player" element={<WasmPlayer />} />
       <Route element={<Layout />}>
         <Route path="/" element={
           nuvioLoggedIn ? <Home /> : <Navigate to="/login" replace />

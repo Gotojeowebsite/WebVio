@@ -172,6 +172,11 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     if (corsProxy) setCorsProxy(corsProxy);
 
+    const safeParse = (str: string | null) => {
+      if (!str) return null;
+      try { return JSON.parse(str); } catch { return null; }
+    };
+
     set({
       nuvioAccessToken,
       nuvioRefreshToken,
@@ -179,15 +184,15 @@ export const useAuthStore = create<AuthState>((set) => ({
       nuvioEmail,
       nuvioLoggedIn: !!nuvioAccessToken,
       torboxApiKey,
-      torboxUser: torboxUserStr ? JSON.parse(torboxUserStr) : null,
+      torboxUser: safeParse(torboxUserStr),
       torboxConnected: !!torboxApiKey,
       simklAccessToken: simklToken,
-      simklUser: simklUserStr ? JSON.parse(simklUserStr) : null,
+      simklUser: safeParse(simklUserStr),
       simklConnected: !!simklToken,
       simklClientId,
       simklClientSecret,
       traktAccessToken: traktToken,
-      traktUser: traktUserStr ? JSON.parse(traktUserStr) : null,
+      traktUser: safeParse(traktUserStr),
       traktConnected: !!traktToken,
       traktClientId,
       corsProxyUrl: corsProxy,

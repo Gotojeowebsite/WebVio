@@ -59,27 +59,7 @@ export default function CatalogRow({ title, items, loading }: Props) {
     }
   }, [items, loading, checkScrollBounds])
 
-  // Wheel listener: translate vertical wheel to smooth horizontal scroll
-  useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
 
-    const handleNativeWheel = (e: WheelEvent) => {
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && Math.abs(e.deltaY) > 2 && !e.shiftKey) {
-        const atLeft = el.scrollLeft <= 0 && e.deltaY < 0
-        const atRight = el.scrollLeft + el.clientWidth >= el.scrollWidth - 5 && e.deltaY > 0
-
-        if (!atLeft && !atRight) {
-          e.preventDefault()
-          el.scrollLeft += e.deltaY * 1.3
-          checkScrollBounds()
-        }
-      }
-    }
-
-    el.addEventListener('wheel', handleNativeWheel, { passive: false })
-    return () => el.removeEventListener('wheel', handleNativeWheel)
-  }, [checkScrollBounds])
 
   // Global mousemove and mouseup listeners for uninterrupted drag-to-scroll
   useEffect(() => {

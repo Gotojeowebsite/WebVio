@@ -18,7 +18,7 @@
   top: calc(var(--navbar-height) + 15px);
   left: 15px;
   bottom: 15px;
-  width: 70px;
+  width: 60px;
   background: rgba(10, 10, 15, 0.3);
   backdrop-filter: blur(30px) saturate(150%);
   -webkit-backdrop-filter: blur(30px) saturate(150%);
@@ -32,7 +32,7 @@
 }
 
 .sidebar:hover {
-  width: 210px;
+  width: 240px;
   background: rgba(15, 15, 20, 0.7);
   border-color: rgba(168, 85, 247, 0.3);
 }
@@ -91,9 +91,9 @@
 .main-content {
   flex: 1 1 0%;
   min-width: 0;
-  max-width: calc(100vw - 100px);
-  width: calc(100vw - 100px);
-  margin-left: 95px;
+  max-width: calc(100vw - 85px);
+  width: calc(100vw - 85px);
+  margin-left: 85px;
   min-height: calc(100vh - var(--navbar-height));
   padding-right: 20px;
   overflow-x: hidden;

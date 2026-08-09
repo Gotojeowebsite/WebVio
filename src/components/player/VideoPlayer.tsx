@@ -346,6 +346,46 @@ export default function VideoPlayer({
     }
   }
 
+
+  const togglePlay = useCallback(() => {
+    if (videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play()
+        setIsPlaying(true)
+      } else {
+        videoRef.current.pause()
+        setIsPlaying(false)
+      }
+    }
+  }, [])
+
+  const toggleMute = useCallback(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = !videoRef.current.muted
+      setIsMuted(videoRef.current.muted)
+      if (!videoRef.current.muted && needsUserUnmute) {
+        setNeedsUserUnmute(false)
+      }
+    }
+  }, [needsUserUnmute])
+
+  const handleUserUnmuteClick = useCallback(() => {
+    if (videoRef.current) {
+      videoRef.current.muted = false
+      setIsMuted(false)
+      setNeedsUserUnmute(false)
+    }
+  }, [])
+
+  const toggleFullscreen = useCallback(async () => {
+    if (!containerRef.current) return
+    if (!document.fullscreenElement) {
+      await containerRef.current.requestFullscreen().catch(err => console.error(err))
+    } else {
+      await document.exitFullscreen().catch(err => console.error(err))
+    }
+  }, [])
+
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -391,46 +431,7 @@ export default function VideoPlayer({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [subtitles, volume])
-
-  const togglePlay = () => {
-    if (videoRef.current) {
-      if (videoRef.current.paused) {
-        videoRef.current.play()
-        setIsPlaying(true)
-      } else {
-        videoRef.current.pause()
-        setIsPlaying(false)
-      }
-    }
-  }
-
-  const toggleMute = () => {
-    if (videoRef.current) {
-      videoRef.current.muted = !videoRef.current.muted
-      setIsMuted(videoRef.current.muted)
-      if (!videoRef.current.muted && needsUserUnmute) {
-        setNeedsUserUnmute(false)
-      }
-    }
-  }
-
-  const handleUserUnmuteClick = () => {
-    if (videoRef.current) {
-      videoRef.current.muted = false
-      setIsMuted(false)
-      setNeedsUserUnmute(false)
-    }
-  }
-
-  const toggleFullscreen = async () => {
-    if (!containerRef.current) return
-    if (!document.fullscreenElement) {
-      await containerRef.current.requestFullscreen().catch(err => console.error(err))
-    } else {
-      await document.exitFullscreen().catch(err => console.error(err))
-    }
-  }
+  }, [subtitles, volume, togglePlay, toggleMute, toggleFullscreen])
 
   const handleSeek = (e: ReactMouseEvent<HTMLDivElement>) => {
     if (!videoRef.current) return

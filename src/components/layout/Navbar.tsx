@@ -3,7 +3,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useFocusable } from '@noriginmedia/norigin-spatial-navigation'
 import { useAuthStore } from '../../store/auth-store'
 import { AddonClient, MetaPreview } from '../../api/addon-client'
-import { calculateRelevanceScore } from '../../pages/Search'
+import { calculateRelevanceScore } from '../../utils/searchUtils'
 
 const CINEMETA_URL = 'https://v3-cinemeta.strem.io/manifest.json'
 const ANIME_KITSU_URL = 'https://anime-kitsu.strem.fun/manifest.json'
@@ -35,7 +35,7 @@ export default function Navbar() {
   const { torboxConnected, simklConnected } = useAuthStore()
 
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20)
+    const handleScroll = () => setScrolled(window.scrollY > 50)
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
@@ -132,9 +132,9 @@ export default function Navbar() {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '16px 40px',
-        background: scrolled ? 'rgba(10, 10, 15, 0.75)' : 'linear-gradient(to bottom, rgba(10,10,15,0.9), transparent)',
-        backdropFilter: scrolled ? 'blur(20px)' : 'none',
-        WebkitBackdropFilter: scrolled ? 'blur(20px)' : 'none',
+        background: scrolled ? 'rgba(10, 10, 15, 0.75)' : 'transparent',
+        backdropFilter: scrolled ? 'blur(40px) saturate(150%)' : 'none',
+        WebkitBackdropFilter: scrolled ? 'blur(40px) saturate(150%)' : 'none',
         borderBottom: scrolled ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid transparent',
         transition: 'all 0.4s ease-in-out'
       }}
@@ -163,7 +163,10 @@ export default function Navbar() {
         <form 
           className={`navbar-search ${searchFocused ? 'focused' : ''}`} 
           onSubmit={handleSearch} 
-          ref={searchBoxRef}
+          ref={(node) => {
+            if (searchBoxRef) (searchBoxRef as any).current = node;
+            if (searchRef) (searchRef as any).current = node;
+          }}
           style={{
             display: 'flex',
             alignItems: 'center',

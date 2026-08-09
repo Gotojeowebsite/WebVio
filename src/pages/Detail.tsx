@@ -14,11 +14,16 @@ export default function Detail() {
   const [loading, setLoading] = useState(true)
   const [streamPickerOpen, setStreamPickerOpen] = useState(false)
   const [selectedVideoId, setSelectedVideoId] = useState<string>('')
-  const [selectedSeason, setSelectedSeason] = useState<number>(1)
+  const [selectedSeason, setSelectedSeason] = useState<number | null>(null)
 
   useEffect(() => {
     if (!type || !id) return
     setLoading(true)
+    let mounted = true
+    
+    // Read search param exactly once to prevent unnecessary re-fetches on query changes
+    const initialEpisode = searchParams.get('episode')
+    const initialSeason = searchParams.get('season')
 
     const fetchMeta = async () => {
       let currentAddons = addons
@@ -46,15 +51,18 @@ export default function Detail() {
           for (const tryType of typesToTry) {
             try {
               const result = await client.getMeta(tryType, id)
+              if (!mounted) return
+              
               if (result && result.meta) {
                 setMeta(result.meta)
                 setLoading(false)
 
-                // Check if an initial video was requested or default to first episode
-                const epParam = searchParams.get('episode')
-                if (epParam) {
-                  setSelectedVideoId(epParam)
+                if (initialEpisode) {
+                  setSelectedVideoId(initialEpisode)
                   setStreamPickerOpen(true)
+                }
+                if (initialSeason) {
+                  setSelectedSeason(Number(initialSeason))
                 }
                 return
               }
@@ -66,15 +74,21 @@ export default function Detail() {
           continue
         }
       }
-      setLoading(false)
+      if (mounted) setLoading(false)
     }
 
     fetchMeta()
-  }, [type, id, addons, loadFromStorage, searchParams])
+    
+    return () => { mounted = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, id, addons, loadFromStorage])
 
   const handlePlay = (videoId?: string) => {
     if (!meta || !type) return
-    const targetVideoId = videoId || (meta.videos && meta.videos.length > 0 ? meta.videos[0].id : meta.id)
+    const targetVideoId = videoId || 
+      (episodesInSeason && episodesInSeason.length > 0 
+        ? episodesInSeason[0].id 
+        : meta.videos && meta.videos.length > 0 ? meta.videos[0].id : meta.id)
     setSelectedVideoId(targetVideoId)
     setStreamPickerOpen(true)
   }
@@ -84,9 +98,11 @@ export default function Detail() {
     ? [...new Set(meta.videos.filter(v => v.season !== undefined && v.season > 0).map(v => v.season!))].sort((a, b) => a - b)
     : []
 
+  const activeSeason = selectedSeason !== null ? selectedSeason : (seasons.length > 0 ? seasons[0] : 1)
+
   const episodesInSeason = meta?.videos
     ? seasons.length > 0
-      ? meta.videos.filter(v => v.season === selectedSeason)
+      ? meta.videos.filter(v => v.season === activeSeason)
       : meta.videos
     : []
 
@@ -118,9 +134,13 @@ export default function Detail() {
   return (
     <div className="detail-page">
       {/* Hero Header */}
-      <div className="detail-hero" style={{
-        backgroundImage: meta.background ? `url(${meta.background})` : meta.poster ? `url(${meta.poster})` : 'none'
-      }}>
+      <div className="detail-hero">
+        <div 
+          className="detail-hero-bg" 
+          style={{
+            backgroundImage: meta.background ? `url(${meta.background})` : meta.poster ? `url(${meta.poster})` : 'none'
+          }}
+        />
         <div className="hero-gradient" />
         <div className="detail-hero-content">
           {meta.logo ? (
@@ -181,7 +201,7 @@ export default function Detail() {
                 {seasons.map(s => (
                   <button
                     key={s}
-                    className={`tab-btn ${selectedSeason === s ? 'tab-active' : ''}`}
+                    className={`tab-btn ${activeSeason === s ? 'tab-active' : ''}`}
                     onClick={() => setSelectedSeason(s)}
                   >
                     Season {s}
@@ -191,11 +211,11 @@ export default function Detail() {
             )}
 
             <div className="episode-list">
-              {episodesInSeason
+              {[...episodesInSeason]
                 .sort((a, b) => (a.episode || 0) - (b.episode || 0))
                 .map((ep, idx) => (
                 <div
-                  key={ep.id || idx}
+                  key={ep.id || `ep-${ep.season}-${ep.episode}-${idx}`}
                   className="episode-item"
                   onClick={() => handlePlay(ep.id)}
                   style={{ cursor: 'pointer', transition: 'all 0.2s ease' }}
