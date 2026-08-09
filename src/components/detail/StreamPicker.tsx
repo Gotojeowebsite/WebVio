@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Link, Zap, Magnet, Globe, Users, X, Inbox } from 'lucide-react'
 import { Meta, Stream, AddonClient } from '../../api/addon-client'
@@ -26,6 +26,7 @@ const DEFAULT_STREAM_PROVIDERS = [
 
 export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: Props) {
   const navigate = useNavigate()
+  const modalRef = useRef<HTMLDivElement>(null)
   const { addons } = useAddonStore()
   const { torboxApiKey, torboxConnected } = useAuthStore()
   const { setStream, setMeta, setVideo } = usePlayerStore()
@@ -34,6 +35,33 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
   const [resolving, setResolving] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState<FilterTab>('all')
+
+  // Focus trap & Escape key listener
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+      } else if (e.key === 'Tab' && modalRef.current) {
+        const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+        if (focusableElements.length === 0) return
+        const first = focusableElements[0]
+        const last = focusableElements[focusableElements.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
 
   const fetchStreams = useCallback(async () => {
     setLoading(true)
@@ -272,12 +300,12 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="stream-picker-modal modal-content" onClick={e => e.stopPropagation()}>
+      <div className="stream-picker-modal modal-content" ref={modalRef} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="stream-picker-title">
         {/* Header */}
         <div className="modal-header">
           <div>
-            <h3 className="stream-picker-title">Select a Stream</h3>
-            <p className="stream-picker-subtitle" style={{ color: 'var(--color-accent-secondary, #f472b6)', fontWeight: 600 }}>
+            <h3 id="stream-picker-title" className="stream-picker-title">Select a Stream</h3>
+            <p className="stream-picker-subtitle" style={{ color: 'var(--accent-magenta)', fontWeight: 600 }}>
               {episodeHeader}
             </p>
           </div>
@@ -313,9 +341,10 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
         {/* Stream list */}
         <div className="modal-body stream-list-container">
           {loading && (
-            <div className="stream-loading">
-              <div className="loading-spinner" />
-              <p>Searching stream providers & debrid caches for this episode...</p>
+            <div className="stream-list">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div key={idx} className="stream-item-skeleton skeleton" />
+              ))}
             </div>
           )}
 
@@ -333,79 +362,83 @@ export default function StreamPicker({ isOpen, onClose, type, videoId, meta }: P
             </div>
           )}
 
-          <div className="stream-list">
-            {filteredStreams.map((stream, index) => {
-              const info = parseStreamInfo(stream)
-              const isResolving = resolving === (stream.infoHash || stream.url || 'resolving')
-              const streamType = stream.url ? 'direct' : stream.infoHash ? 'torrent' : 'external'
+          {!loading && (
+            <div className="stream-list">
+              {filteredStreams.map((stream, index) => {
+                const info = parseStreamInfo(stream)
+                const isResolving = resolving === (stream.infoHash || stream.url || 'resolving')
+                const streamType = stream.url ? 'direct' : stream.infoHash ? 'torrent' : 'external'
 
-              return (
-                <div
-                  key={`${stream.infoHash || stream.url || index}-${index}`}
-                  className={`stream-item ${isResolving ? 'resolving' : ''}`}
-                  onClick={() => !resolving && handleStreamSelect(stream)}
-                  tabIndex={0}
-                  role="button"
-                  aria-label={`Play stream ${info.cleanTitle}`}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      if (!resolving) handleStreamSelect(stream)
-                    }
-                  }}
-                >
-                  <div className="stream-item-header">
-                    <div className="stream-item-left">
-                      <span className="stream-type-icon" aria-hidden="true">
-                        {streamType === 'direct' && <Link size={18} />}
-                        {streamType === 'torrent' && (stream.isCached ? <Zap size={18} /> : <Magnet size={18} />)}
-                        {streamType === 'external' && <Globe size={18} />}
-                      </span>
-                      <div className="stream-item-info">
-                        <p className="stream-item-title">
-                          {info.cleanTitle}
-                        </p>
-                        <div className="stream-item-meta">
-                          {info.quality && (
-                            <span className={`badge ${info.quality === '4K' ? 'badge-4k' : 'badge-hd'}`}>
-                              {info.quality}
-                            </span>
-                          )}
-                          {stream.isCached && (
-                            <span className="badge badge-cached" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                              <Zap size={12} aria-hidden="true" /> CACHED
-                            </span>
-                          )}
-                          {stream.isCached === false && stream.infoHash && (
-                            <span className="badge badge-uncached">UNCACHED</span>
-                          )}
-                          {streamType === 'direct' && (
-                            <span className="badge" style={{background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.3)'}}>
-                              FREE DIRECT
-                            </span>
-                          )}
-                          {info.codec && <span className="badge">{info.codec}</span>}
-                          {info.hdr && <span className="badge badge-4k">HDR</span>}
-                          {info.audio && <span className="badge">{info.audio}</span>}
-                          {info.size && <span className="stream-size">{info.size}</span>}
-                          {info.seeders !== null && (
-                            <span className={`stream-peers ${
-                              info.seeders > 50 ? 'healthy' : info.seeders > 10 ? 'average' : 'poor'
-                            }`} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                              <Users size={14} aria-hidden="true" /> {info.seeders}
-                            </span>
-                          )}
+                return (
+                  <div
+                    key={`${stream.infoHash || stream.url || index}-${index}`}
+                    className={`stream-item ${isResolving ? 'resolving' : ''}`}
+                    onClick={() => !resolving && handleStreamSelect(stream)}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`Play stream ${info.cleanTitle}`}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        if (!resolving) handleStreamSelect(stream)
+                      }
+                    }}
+                  >
+                    <div className="stream-item-header">
+                      <div className="stream-item-left">
+                        <span className="stream-type-icon" aria-hidden="true">
+                          {streamType === 'direct' && <Link size={18} />}
+                          {streamType === 'torrent' && (stream.isCached ? <Zap size={18} /> : <Magnet size={18} />)}
+                          {streamType === 'external' && <Globe size={18} />}
+                        </span>
+                        <div className="stream-item-info">
+                          <p className="stream-item-title">
+                            {info.cleanTitle}
+                          </p>
+                          <div className="stream-badges-left">
+                            {info.quality && (
+                              <span className={`badge ${info.quality === '4K' ? 'badge-4k' : 'badge-hd'}`}>
+                                {info.quality}
+                              </span>
+                            )}
+                            {stream.isCached && (
+                              <span className="badge badge-cached" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <Zap size={12} aria-hidden="true" /> CACHED
+                              </span>
+                            )}
+                            {stream.isCached === false && stream.infoHash && (
+                              <span className="badge badge-uncached">UNCACHED</span>
+                            )}
+                            {streamType === 'direct' && (
+                              <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.3)' }}>
+                                FREE DIRECT
+                              </span>
+                            )}
+                            {info.codec && <span className="badge">{info.codec}</span>}
+                            {info.hdr && <span className="badge badge-4k">HDR</span>}
+                            {info.audio && <span className="badge">{info.audio}</span>}
+                            <span className="stream-addon-source">{info.source || stream.addonName}</span>
+                          </div>
                         </div>
-                        <p className="stream-addon-source">{info.source || stream.addonName}</p>
+                      </div>
+
+                      <div className="stream-meta-right">
+                        {info.size && <span className="stream-size">{info.size}</span>}
+                        {info.seeders !== null && (
+                          <span className={`stream-peers ${
+                            info.seeders > 50 ? 'healthy' : info.seeders > 10 ? 'average' : 'poor'
+                          }`} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                            <Users size={14} aria-hidden="true" /> {info.seeders}
+                          </span>
+                        )}
+                        {isResolving && <div className="loading-spinner stream-spinner" />}
                       </div>
                     </div>
-                    {isResolving && <div className="loading-spinner stream-spinner" />}
                   </div>
-
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
