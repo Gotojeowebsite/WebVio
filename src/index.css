@@ -764,29 +764,33 @@ h6 { font-size: var(--font-size-lg); font-weight: 600; line-height: 1.4; }
 .navbar {
   height: var(--navbar-height);
   position: fixed;
-  top: 15px;
+  top: var(--space-4);
   left: 50%;
   transform: translateX(-50%);
-  width: calc(100vw - 2rem);
+  width: calc(100vw - var(--space-6));
   max-width: 1400px;
   z-index: 100;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--spacing-6);
-  background: rgba(10, 10, 15, 0.3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--bg-glass);
   backdrop-filter: blur(30px) saturate(150%);
   -webkit-backdrop-filter: blur(30px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
-  transition: all var(--transition-normal);
-  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: background var(--duration-base) var(--ease-out),
+              backdrop-filter var(--duration-base) var(--ease-out),
+              -webkit-backdrop-filter var(--duration-base) var(--ease-out),
+              box-shadow var(--duration-base) var(--ease-out),
+              border-color var(--duration-base) var(--ease-out);
+  box-shadow: var(--shadow-md);
 }
 
 .navbar.scrolled {
-  background: rgba(15, 15, 20, 0.7);
-  border-color: rgba(168, 85, 247, 0.3);
-  box-shadow: 0 10px 40px -10px rgba(168, 85, 247, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  background: rgba(8, 9, 13, 0.95);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-lg), var(--shadow-glow);
 }
 
 .navbar-brand {

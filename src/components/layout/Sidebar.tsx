@@ -9,11 +9,10 @@ const NAV_ITEMS = [
   { path: '/settings', icon: Settings, label: 'Settings' },
 ]
 
-function SidebarItemComponent({ item, active, onClick }: { item: typeof NAV_ITEMS[0], active: boolean, onClick: () => void }) {
+function DesktopSidebarItem({ item, active, onClick }: { item: typeof NAV_ITEMS[0], active: boolean, onClick: () => void }) {
   const { ref, focused } = useFocusable({
     onEnterPress: onClick
   })
-
   const Icon = item.icon
 
   return (
@@ -31,6 +30,21 @@ function SidebarItemComponent({ item, active, onClick }: { item: typeof NAV_ITEM
   )
 }
 
+function MobileTabItem({ item, active, onClick }: { item: typeof NAV_ITEMS[0], active: boolean, onClick: () => void }) {
+  const Icon = item.icon
+
+  return (
+    <button
+      className={`bottom-tab-item ${active ? 'active' : ''}`}
+      onClick={onClick}
+      aria-label={item.label}
+    >
+      <Icon size={20} aria-hidden="true" />
+      <span className="bottom-tab-label">{item.label}</span>
+    </button>
+  )
+}
+
 export default function Sidebar() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -41,10 +55,25 @@ export default function Sidebar() {
   })
 
   return (
-    <aside className="sidebar" ref={focusKeyRef}>
-      <nav className="sidebar-nav">
+    <>
+      {/* Desktop Floating Rail (>768px) */}
+      <aside className="sidebar sidebar-desktop" ref={focusKeyRef} aria-label="Main Navigation">
+        <nav className="sidebar-nav">
+          {NAV_ITEMS.map((item) => (
+            <DesktopSidebarItem
+              key={item.path}
+              item={item}
+              active={location.pathname === item.path}
+              onClick={() => navigate(item.path)}
+            />
+          ))}
+        </nav>
+      </aside>
+
+      {/* Mobile Fixed Bottom Tab Bar (<=768px) */}
+      <nav className="bottom-tab-bar" aria-label="Mobile Navigation">
         {NAV_ITEMS.map((item) => (
-          <SidebarItemComponent
+          <MobileTabItem
             key={item.path}
             item={item}
             active={location.pathname === item.path}
@@ -52,6 +81,6 @@ export default function Sidebar() {
           />
         ))}
       </nav>
-    </aside>
+    </>
   )
 }
